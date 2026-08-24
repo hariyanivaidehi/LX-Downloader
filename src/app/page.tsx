@@ -807,7 +807,7 @@ export default function Home() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="py-4 px-8 rounded-2xl bg-blue-600 hover:bg-blue-600 text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-blue-500/10 active:scale-95 transition-all cursor-pointer shrink-0"
+                  className="py-3.5 px-6 rounded-xl bg-blue-600 hover:bg-blue-600 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/10 active:scale-95 transition-all cursor-pointer shrink-0"
                 >
                   {loading ? (
                     <RefreshCw className="w-5 h-5 animate-spin" />
