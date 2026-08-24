@@ -770,7 +770,7 @@ export default function Home() {
                 onSubmit={handleDownloadSubmit}
                 className="flex flex-col sm:flex-row gap-3 items-stretch"
               >
-                <div className="relative flex-grow bg-white rounded-2xl shadow-inner flex items-center pr-3">
+                <div className="relative flex-grow bg-white rounded-xl shadow-inner flex items-center pr-3">
                   <div className="pl-4 text-slate-400 pointer-events-none shrink-0">
                     <Link2 className="w-5 h-5" />
                   </div>
@@ -779,7 +779,7 @@ export default function Home() {
                     value={inputUrl}
                     onChange={(e) => setInputUrl(e.target.value)}
                     placeholder={d.pastePlaceholder}
-                    className="block w-full pl-3 pr-16 py-4 text-sm sm:text-base text-slate-855 placeholder-slate-400 bg-transparent border-0 ring-0 focus:outline-none focus:ring-0"
+                    className="block w-full pl-3 pr-16 py-3 text-xs sm:text-sm text-slate-855 placeholder-slate-400 bg-transparent border-0 ring-0 focus:outline-none focus:ring-0"
                   />
 
                   {/* Actions in input container */}
@@ -807,7 +807,7 @@ export default function Home() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="py-3.5 px-6 rounded-xl bg-blue-600 hover:bg-blue-600 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/10 active:scale-95 transition-all cursor-pointer shrink-0"
+                  className="py-3 px-4.5 rounded-xl bg-blue-600 hover:bg-blue-600 text-white font-black text-[11px] sm:text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-500/10 active:scale-95 transition-all cursor-pointer shrink-0"
                 >
                   {loading ? (
                     <RefreshCw className="w-5 h-5 animate-spin" />
