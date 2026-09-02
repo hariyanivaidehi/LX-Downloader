@@ -678,31 +678,31 @@ export default function Home() {
   const faqs = d.faqs || VOCABULARY.en.faqs;
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 text-slate-900 overflow-x-hidden transition-colors duration-300">
+    <div className="flex flex-col min-h-screen bg-slate-50 text-slate-900 overflow-x-clip transition-colors duration-300">
       {/* Downloader Section */}
-      <section className="relative pt-10 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center w-full">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] md:w-[600px] h-[350px] md:h-[600px] bg-gradient-to-tr from-blue-600/10 to-indigo-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      <section className="relative pt-6 pb-12 sm:pt-10 sm:pb-16 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 text-center w-full">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] sm:w-[500px] md:w-[600px] h-[300px] sm:h-[500px] md:h-[600px] bg-gradient-to-tr from-blue-600/10 to-indigo-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
 
         {/* Brand Tagline */}
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/5 text-blue-600 text-xs font-bold mb-8">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/5 text-blue-600 text-[11px] sm:text-xs font-bold mb-6 sm:mb-8">
           <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
           100% Free & Unlimited Downloader
         </div>
 
         {/* Downloader panel box (Completely BORDERLESS, shadow-based card) */}
-        <div ref={downloaderRef} id="downloader" className="scroll-mt-24 max-w-5xl mx-auto">
+        <div ref={downloaderRef} id="downloader" className="scroll-mt-20 sm:scroll-mt-24 max-w-5xl mx-auto">
           
           {/* LEVEL 1 PLATFORM TABS: INSTAGRAM vs YOUTUBE */}
-          <div className="grid grid-cols-2 bg-white rounded-t-3xl overflow-hidden shadow-xl shadow-slate-100 relative">
+          <div className="grid grid-cols-2 bg-white rounded-t-2xl sm:rounded-t-3xl overflow-hidden shadow-xl shadow-slate-100 relative">
             
             {/* Instagram Tab */}
             <button
               onClick={() => setPlatform("instagram")}
-              className={`relative py-5 flex items-center justify-center gap-2.5 font-extrabold text-sm sm:text-base tracking-wide transition-all active:scale-[0.98] cursor-pointer outline-none z-10 ${
+              className={`relative py-4 sm:py-5 flex items-center justify-center gap-2 sm:gap-2.5 font-extrabold text-xs sm:text-base tracking-wide transition-all active:scale-[0.98] cursor-pointer outline-none z-10 ${
                 platform === "instagram" ? "text-blue-600" : "text-slate-500"
               }`}
             >
-              <InstagramIcon className="w-5 h-5" />
+              <InstagramIcon className="w-4 h-4 sm:w-5 sm:h-5" />
               INSTAGRAM
               
               {platform === "instagram" && (
@@ -717,11 +717,11 @@ export default function Home() {
             {/* YouTube Tab */}
             <button
               onClick={() => setPlatform("youtube")}
-              className={`relative py-5 flex items-center justify-center gap-2.5 font-extrabold text-sm sm:text-base tracking-wide transition-all active:scale-[0.98] cursor-pointer outline-none z-10 ${
+              className={`relative py-4 sm:py-5 flex items-center justify-center gap-2 sm:gap-2.5 font-extrabold text-xs sm:text-base tracking-wide transition-all active:scale-[0.98] cursor-pointer outline-none z-10 ${
                 platform === "youtube" ? "text-blue-600" : "text-slate-500"
               }`}
             >
-              <YoutubeIcon className="w-5 h-5" />
+              <YoutubeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
               YOUTUBE
 
               {platform === "youtube" && (
@@ -735,14 +735,14 @@ export default function Home() {
           </div>
 
           {/* Level 2 Subpanel (Borderless shadow card) */}
-          <div className="bg-slate-100 backdrop-blur-md p-6 md:p-10 rounded-b-3xl shadow-xl shadow-slate-100/60 relative overflow-hidden transition-colors duration-300">
+          <div className="bg-slate-100 backdrop-blur-md p-4 sm:p-6 md:p-10 rounded-b-2xl sm:rounded-b-3xl shadow-xl shadow-slate-100/60 relative overflow-hidden transition-colors duration-300">
             {/* Header Text */}
-            <span className="block text-xs font-black tracking-widest text-blue-600 mb-6 text-center select-none uppercase">
+            <span className="block text-[10px] sm:text-xs font-black tracking-widest text-blue-600 mb-4 sm:mb-6 text-center select-none uppercase">
               {platform === "instagram" ? d.instagramText : d.youtubeText}
             </span>
 
             {/* LEVEL 2 SUBTABS */}
-            <div className="mb-8">
+            <div className="mb-6 sm:mb-8">
               <AnimatePresence mode="wait">
                 {platform === "instagram" ? (
                   /* Instagram Subtabs: Reels, Post, Story, DP, Highlight */
@@ -751,7 +751,7 @@ export default function Home() {
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -5 }}
-                    className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 animate-fade-in"
+                    className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 animate-fade-in"
                   >
                     {[
                       { id: "reels", label: "Reels", icon: Film },
@@ -765,13 +765,13 @@ export default function Home() {
                         <button
                           key={tab.id}
                           onClick={() => setSubTab(tab.id)}
-                          className={`flex items-center justify-center gap-2 py-3 px-6 rounded-2xl text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
+                          className={`flex items-center justify-center gap-1.5 sm:gap-2 py-2 px-3 sm:py-3 sm:px-6 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
                             subTab === tab.id
                               ? "bg-white text-blue-600 shadow-md"
                               : "bg-white/40 text-slate-650 hover:bg-white"
                           }`}
                         >
-                          <Icon className="w-4 h-4" />
+                          <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           {tab.label}
                         </button>
                       );
@@ -784,7 +784,7 @@ export default function Home() {
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -5 }}
-                    className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 animate-fade-in"
+                    className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 animate-fade-in"
                   >
                     {[
                       { id: "youtubeVideo", label: "Video", icon: Play },
@@ -795,13 +795,13 @@ export default function Home() {
                         <button
                           key={tab.id}
                           onClick={() => setSubTab(tab.id)}
-                          className={`flex items-center justify-center gap-2 py-3 px-6 rounded-2xl text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
+                          className={`flex items-center justify-center gap-1.5 sm:gap-2 py-2 px-4 sm:py-3 sm:px-6 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
                             subTab === tab.id
                               ? "bg-white text-blue-600 shadow-md"
                               : "bg-white/40 text-slate-655 hover:bg-white"
                           }`}
                         >
-                          <Icon className="w-4 h-4" />
+                          <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           {tab.label}
                         </button>
                       );
@@ -812,7 +812,7 @@ export default function Home() {
             </div>
 
             {/* Sub-tab Dynamic Title */}
-            <h2 className="text-xl sm:text-2xl font-black text-slate-905 mb-6">
+            <h2 className="text-lg sm:text-2xl font-black text-slate-905 mb-4 sm:mb-6">
               {desc.title}
             </h2>
 
