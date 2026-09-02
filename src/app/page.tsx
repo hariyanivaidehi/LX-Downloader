@@ -511,6 +511,7 @@ export default function Home() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const downloaderRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Client-side query parameters parsing (avoids React Suspense bailout)
   const [langCode, setLangCode] = useState("en");
@@ -618,20 +619,38 @@ export default function Home() {
 
   const handlePaste = async () => {
     try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        setInputUrl(text);
-        // IMMEDIATE ACTION: start download fetch instantly on paste
-        triggerSearchDirect(text);
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          setInputUrl(text.trim());
+          triggerSearchDirect(text.trim());
+          return;
+        }
       }
-    } catch (err) {
-      setErrorMsg("Failed to read clipboard. Please paste link manually.");
+    } catch {
+      // Gracefully ignore permission rejection and focus input instead of showing alert error
+    }
+    if (inputRef.current) {
+      inputRef.current.focus();
     }
   };
 
   const handleClear = () => {
     setInputUrl("");
     setErrorMsg("");
+    setResult(null);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  const handleClearResult = () => {
+    setResult(null);
+    setInputUrl("");
+    setErrorMsg("");
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   };
 
   const handleDownloadSubmit = (e: React.FormEvent) => {
@@ -820,38 +839,42 @@ export default function Home() {
             <div className="max-w-4xl mx-auto">
               <form
                 onSubmit={handleDownloadSubmit}
-                className="flex flex-col sm:flex-row gap-3 items-stretch"
+                className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch"
               >
-                <div className="relative flex-grow bg-white rounded-xl shadow-inner flex items-center pr-3">
-                  <div className="pl-4 text-slate-400 pointer-events-none shrink-0">
-                    <Link2 className="w-5 h-5" />
+                <div className="relative flex-1 bg-white rounded-2xl shadow-inner flex items-center px-3.5 py-1 sm:py-0 transition-all border border-slate-200/80 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+                  <div className="text-slate-400 pointer-events-none shrink-0 pr-2">
+                    <Link2 className="w-5 h-5 text-blue-600/70" />
                   </div>
                   <input
+                    ref={inputRef}
                     type="text"
                     value={inputUrl}
                     onChange={(e) => setInputUrl(e.target.value)}
                     placeholder={d.pastePlaceholder}
-                    className="block w-full pl-3 pr-16 py-3 text-xs sm:text-sm text-slate-855 placeholder-slate-400 bg-transparent border-0 ring-0 focus:outline-none focus:ring-0"
+                    className="flex-1 min-w-0 py-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent border-0 ring-0 focus:outline-none focus:ring-0"
                   />
 
-                  {/* Actions in input container */}
-                  <div className="flex items-center gap-1">
-                    {inputUrl && (
+                  {/* Context-aware Actions: If link exists, show Clear (X); if empty, show Paste button */}
+                  <div className="flex items-center shrink-0 pl-1.5">
+                    {inputUrl ? (
                       <button
                         type="button"
                         onClick={handleClear}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all active:scale-95 cursor-pointer"
+                        title="Clear link"
+                        aria-label="Clear link"
                       >
                         <X className="w-4 h-4" />
                       </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handlePaste}
+                        className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 text-xs font-bold transition-all cursor-pointer active:scale-95"
+                      >
+                        {d.pasteBtn}
+                      </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={handlePaste}
-                      className="px-2.5 py-1.5 rounded-lg bg-slate-105 text-slate-605 hover:text-blue-600 text-xs font-bold transition-all cursor-pointer active:scale-95 shrink-0"
-                    >
-                      {d.pasteBtn}
-                    </button>
                   </div>
                 </div>
 
@@ -859,12 +882,12 @@ export default function Home() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="py-3 px-4.5 rounded-xl bg-blue-600 hover:bg-blue-600 text-white font-black text-[11px] sm:text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-500/10 active:scale-95 transition-all cursor-pointer shrink-0"
+                  className="py-3.5 px-6 rounded-xl sm:rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 active:scale-95 transition-all cursor-pointer shrink-0"
                 >
                   {loading ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <RefreshCw className="w-4.5 h-4.5 animate-spin" />
                   ) : (
-                    <Search className="w-5 h-5" />
+                    <Search className="w-4.5 h-4.5" />
                   )}
                   {d.searchBtn}
                 </button>
@@ -978,7 +1001,7 @@ export default function Home() {
                     )}
 
                     <button
-                      onClick={() => setResult(null)}
+                      onClick={handleClearResult}
                       className="text-xs font-bold text-slate-400 hover:text-slate-600 py-1 transition-colors cursor-pointer"
                     >
                       {d.clearBtn}
