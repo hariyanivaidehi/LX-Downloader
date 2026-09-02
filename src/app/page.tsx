@@ -918,100 +918,51 @@ export default function Home() {
               )}
             </AnimatePresence>
 
-            {/* Dynamic Results Card Panel */}
+            {/* Dynamic Results Card Panel - Clean Full Video Player & Solid Blue Download Button */}
             <AnimatePresence>
               {result && !loading && (
                 <motion.div
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -15 }}
-                  className="mt-8 p-4 sm:p-6 bg-white rounded-2xl text-left max-w-4xl mx-auto shadow-2xl shadow-slate-100"
+                  className="mt-8 p-4 sm:p-6 bg-white rounded-3xl text-center max-w-lg mx-auto shadow-2xl shadow-slate-100 flex flex-col items-center gap-5"
                 >
-                  {/* Account detail */}
-                  <div className="flex items-center justify-between pb-4 mb-6">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={result.avatar}
-                        alt={result.user}
-                        className="w-12 h-12 rounded-full border-2 border-blue-600 object-cover shadow-sm"
+                  {/* Full Playable Video or Full Image Preview */}
+                  <div className="w-full max-w-md rounded-2xl overflow-hidden bg-black shadow-lg flex items-center justify-center relative">
+                    {result.type === "video" || result.download_url?.includes(".mp4") ? (
+                      <video
+                        src={result.download_url}
+                        poster={result.avatar || result.thumbnail || result.items?.[0]?.url}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="w-full max-h-[540px] object-contain mx-auto"
                       />
-                      <div>
-                        <h4 className="text-sm sm:text-base font-extrabold text-slate-900">@{result.user}</h4>
-                        <span className="text-xs text-slate-550">{platform === "instagram" ? d.mockUser : d.mockYoutubeUser}</span>
-                      </div>
-                    </div>
+                    ) : (
+                      <img
+                        src={result.download_url || result.items?.[0]?.url}
+                        alt="Media Preview"
+                        className="w-full max-h-[540px] object-contain mx-auto"
+                      />
+                    )}
+                  </div>
+
+                  {/* Clean Solid Blue Download Now Button */}
+                  <div className="w-full max-w-md flex flex-col gap-2.5">
+                    <button
+                      onClick={() => triggerDownloadAction(result.download_url, result.title)}
+                      className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm sm:text-base tracking-wider active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 group"
+                    >
+                      <Download className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
+                      DOWNLOAD NOW
+                    </button>
+
                     <button
                       onClick={() => setResult(null)}
-                      className="px-3.5 py-1.5 rounded-xl bg-slate-105 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all active:scale-95 cursor-pointer"
+                      className="text-xs font-bold text-slate-400 hover:text-slate-600 py-1 transition-colors cursor-pointer"
                     >
                       {d.clearBtn}
                     </button>
-                  </div>
-
-                  {/* Media items container */}
-                  <div className="grid grid-cols-1 gap-6 mb-6">
-                    {result.items.map((item: any, idx: number) => (
-                      <div key={item.id} className="relative rounded-2xl overflow-hidden bg-slate-50 flex flex-col sm:flex-row items-stretch shadow-inner">
-                        
-                        {/* Media display left */}
-                        <div className="relative aspect-video sm:w-64 md:w-80 bg-slate-200 flex items-center justify-center shrink-0 overflow-hidden">
-                          <img
-                            src={item.url}
-                            alt={item.tag}
-                            className="w-full h-full object-cover opacity-90"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-
-                          {item.type === "video" && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white shadow-md active:scale-90 transition-transform">
-                                <Play className="w-5 h-5 fill-current ml-0.5" />
-                              </div>
-                            </div>
-                          )}
-
-                          <span className="absolute bottom-2.5 left-3 text-[10px] sm:text-xs font-bold text-white px-2.5 py-0.5 rounded bg-black/75">
-                            {result.items.length > 1 ? `Item #${idx + 1}` : result.type}
-                          </span>
-                        </div>
-
-                        {/* Title details right */}
-                        <div className="p-5 flex flex-col justify-center flex-grow space-y-2">
-                          <span className="text-[10px] uppercase font-black tracking-wider text-blue-600">Media Title</span>
-                          <h4 className="text-sm sm:text-base font-extrabold text-slate-855 leading-normal">
-                            {item.tag}
-                          </h4>
-                          <p className="text-xs text-slate-400">HD MP4 Format &bull; High Definition Resolution parsed successfully.</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* PROMINENT START DOWNLOADING BUTTON */}
-                  <div className="pt-4 border-t border-slate-100">
-                    <button
-                      onClick={() => triggerDownloadAction(result.download_url, result.title)}
-                      className="w-full py-4.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 text-white font-black text-sm sm:text-base tracking-wider hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 group"
-                    >
-                      <Download className="w-5.5 h-5.5 group-hover:translate-y-0.5 transition-transform" />
-                      {d.startDownloadBtn}
-                    </button>
-                    
-                    {/* Mirror links */}
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={() => triggerDownloadAction(result.options?.[0]?.url || result.download_url, (result.title || "Media") + "_HD")}
-                        className="w-1/2 py-2.5 rounded-xl bg-slate-105 hover:bg-slate-200 text-slate-650 text-xs font-bold transition-all cursor-pointer active:scale-95 text-center border-0"
-                      >
-                        {d.mirrorBtn} (HD)
-                      </button>
-                      <button
-                        onClick={() => triggerDownloadAction(result.options?.[1]?.url || result.download_url, (result.title || "Media") + "_SD")}
-                        className="w-1/2 py-2.5 rounded-xl bg-slate-105 hover:bg-slate-200 text-slate-655 text-xs font-bold transition-all cursor-pointer active:scale-95 text-center border-0"
-                      >
-                        {d.mirrorBtn} (SD)
-                      </button>
-                    </div>
                   </div>
                 </motion.div>
               )}
