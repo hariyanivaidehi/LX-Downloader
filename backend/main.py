@@ -13,7 +13,7 @@ import yt_dlp
 app = FastAPI(
     title="LX-Downloader API",
     description="High-performance backend API for Instagram and YouTube media extraction and streaming downloads.",
-    version="1.0.0",
+    version="1.1.0",
 )
 
 # Enable CORS for frontend development
@@ -48,6 +48,9 @@ def sanitize_filename(name: str, ext: str = "mp4") -> str:
 
 def extract_youtube(url: str) -> Dict[str, Any]:
     """Extract YouTube video or Short details using yt-dlp."""
+    # Clean up tracking params
+    clean_url = url.strip()
+    
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
@@ -56,7 +59,7 @@ def extract_youtube(url: str) -> Dict[str, Any]:
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+            info = ydl.extract_info(clean_url, download=False)
             
             title = info.get("title", "YouTube Video")
             author = info.get("uploader", info.get("channel", "YouTube Creator"))
@@ -128,17 +131,24 @@ def extract_youtube(url: str) -> Dict[str, Any]:
                 "options": download_options,
             }
     except Exception as e:
+        err_msg = str(e).lower()
+        if "private video" in err_msg or "sign in" in err_msg:
+            raise HTTPException(
+                status_code=400,
+                detail="This YouTube video is private or restricted. Only public videos can be downloaded."
+            )
         raise HTTPException(
             status_code=400,
-            detail=f"Unable to extract YouTube media: {str(e)}"
+            detail=f"Unable to extract YouTube media. Please check if the video link is valid and public."
         )
 
 
 def extract_instagram(url: str) -> Dict[str, Any]:
-    """Extract Instagram Reel, Post, DP, or Story details."""
+    """Extract Instagram Reel, Post, DP, Story, or Highlight details."""
     clean_url = url.split("?")[0].rstrip("/") + "/"
+    is_private_detected = False
     
-    # Check if this is a profile URL (e.g. instagram.com/username/)
+    # Check if this is a profile DP URL (e.g. instagram.com/username/)
     profile_match = re.search(r"instagram\.com/([a-zA-Z0-9._]+)/?$", clean_url)
     is_not_reserved = profile_match and profile_match.group(1).lower() not in [
         "p", "reel", "reels", "stories", "tv", "explore", "direct"
@@ -155,7 +165,6 @@ def extract_instagram(url: str) -> Dict[str, Any]:
                 
                 if og_image:
                     pic_url = html.unescape(og_image[0])
-                    # Clean the 100x100 thumbnail restriction to get full HD profile picture
                     hd_pic_url = re.sub(r"s150x150/|s320x320/|s100x100/", "", pic_url)
                     title = html.unescape(og_title[0]) if og_title else f"@{username}'s Profile Picture"
                     
@@ -173,10 +182,10 @@ def extract_instagram(url: str) -> Dict[str, Any]:
                             {"id": "hd_image", "label": "Full HD Profile Picture (JPG)", "ext": "jpg", "url": hd_pic_url}
                         ],
                     }
-        except Exception as e:
+        except Exception:
             pass
 
-    # Try yt-dlp first for Reels and Video Posts
+    # Try yt-dlp first for Reels, Posts, Stories, and Highlights
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
@@ -191,41 +200,62 @@ def extract_instagram(url: str) -> Dict[str, Any]:
             video_url = info.get("url") or ""
             duration = info.get("duration")
             
-            # If multiple entries (carousel)
+            # Carousel or multiple items handling
             entries = info.get("entries")
+            options = []
             if entries and len(entries) > 0:
                 first = entries[0]
                 video_url = first.get("url") or video_url
                 thumbnail = first.get("thumbnail") or thumbnail
                 title = first.get("title") or title
+                
+                for idx, entry in enumerate(entries):
+                    e_url = entry.get("url")
+                    if e_url:
+                        e_ext = "jpg" if e_url.endswith((".jpg", ".png", ".webp")) else "mp4"
+                        options.append({
+                            "id": f"item_{idx+1}",
+                            "label": f"Download Item #{idx+1} ({e_ext.upper()})",
+                            "ext": e_ext,
+                            "url": e_url
+                        })
+
+            if not options and video_url:
+                v_ext = "jpg" if video_url.endswith((".jpg", ".png", ".webp")) else "mp4"
+                options.append({
+                    "id": "best_media",
+                    "label": f"Download Media ({v_ext.upper()})",
+                    "ext": v_ext,
+                    "url": video_url
+                })
 
             if video_url:
+                is_img = video_url.endswith((".jpg", ".png", ".webp"))
                 return {
                     "success": True,
                     "platform": "instagram",
-                    "type": "video" if not video_url.endswith((".jpg", ".png", ".webp")) else "image",
+                    "type": "image" if is_img else "video",
                     "title": title[:100],
                     "author": author,
                     "avatar": thumbnail,
                     "thumbnail": thumbnail,
                     "duration": duration,
                     "download_url": video_url,
-                    "options": [
-                        {
-                            "id": "best_video",
-                            "label": "High Definition (MP4)" if not video_url.endswith((".jpg", ".png", ".webp")) else "High Definition (JPG)",
-                            "ext": "mp4" if not video_url.endswith((".jpg", ".png", ".webp")) else "jpg",
-                            "url": video_url,
-                        }
-                    ],
+                    "options": options,
                 }
     except Exception as yt_err:
-        pass
+        yt_err_str = str(yt_err).lower()
+        if any(term in yt_err_str for term in ["private", "login", "logged-in", "cookies", "restricted", "empty media"]):
+            is_private_detected = True
 
-    # Fallback to social crawler extraction
+    # Fallback to social crawler extraction (for public posts & stories)
     try:
         resp = requests.get(clean_url, headers=CRAWLER_HEADERS, timeout=10)
         if resp.status_code == 200:
+            resp_lower = resp.text.lower()
+            if "this account is private" in resp_lower or "accounts/login" in resp.url or "login • instagram" in resp_lower:
+                is_private_detected = True
+            
             og_video = re.findall(r'<meta property="og:video" content="([^"]+)"', resp.text)
             og_image = re.findall(r'<meta property="og:image" content="([^"]+)"', resp.text)
             og_title = re.findall(r'<meta property="og:title" content="([^"]+)"', resp.text)
@@ -255,12 +285,19 @@ def extract_instagram(url: str) -> Dict[str, Any]:
                         }
                     ],
                 }
-    except Exception as crawler_err:
+    except Exception:
         pass
+
+    # If it was detected as private or requires login:
+    if is_private_detected or "stories" in clean_url or "highlights" in clean_url:
+        raise HTTPException(
+            status_code=400,
+            detail="This account is private or requires login. You can only download Reels, Stories, Posts, and Highlights from public accounts."
+        )
 
     raise HTTPException(
         status_code=400,
-        detail="Unable to fetch this Instagram content. Please verify that the post is public."
+        detail="Unable to fetch this Instagram content. Please verify that the post or account is public."
     )
 
 
@@ -329,4 +366,4 @@ async def download_file(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)

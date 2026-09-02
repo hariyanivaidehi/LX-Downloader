@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { 
-  Flame, Link2, Play, Download, RefreshCw, Film, Image as ImageIcon, Compass, UserCheck, Search, X, ChevronDown
+  Flame, Link2, Play, Download, RefreshCw, Film, Image as ImageIcon, Compass, UserCheck, Search, X, ChevronDown, AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -871,9 +871,14 @@ export default function Home() {
               </form>
 
               {errorMsg && (
-                <p className="text-red-500 text-xs font-bold text-left mt-2 pl-1">
-                  {errorMsg}
-                </p>
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-3.5 p-3.5 rounded-xl bg-red-50 border border-red-200/80 text-red-700 text-xs sm:text-sm font-semibold flex items-center gap-2.5 text-left shadow-sm max-w-xl mx-auto"
+                >
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>{errorMsg}</span>
+                </motion.div>
               )}
             </div>
 
@@ -956,6 +961,21 @@ export default function Home() {
                       <Download className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
                       DOWNLOAD NOW
                     </button>
+
+                    {/* Carousel Items or Additional Format Options */}
+                    {result.options && result.options.length > 1 && (
+                      <div className="flex flex-wrap gap-2 pt-1 justify-center">
+                        {result.options.map((opt: any) => (
+                          <button
+                            key={opt.id}
+                            onClick={() => triggerDownloadAction(opt.url, (result.title || "Media") + "_" + opt.id)}
+                            className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95 border border-slate-200"
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
 
                     <button
                       onClick={() => setResult(null)}
