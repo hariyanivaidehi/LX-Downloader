@@ -532,18 +532,23 @@ export default function Home() {
     setResult(null);
   }, [subTab]);
 
-  // Trigger search simulation directly (used on immediate paste click)
-  const triggerSearchDirect = (url: string) => {
-    const trimmed = url.trim().toLowerCase();
+  // Trigger real search extraction directly against the Python backend
+  const triggerSearchDirect = async (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) {
+      setErrorMsg("Please paste a valid URL link.");
+      return;
+    }
     
     // Quick validation
+    const lower = trimmed.toLowerCase();
     if (platform === "youtube") {
-      if (!trimmed.includes("youtube.com") && !trimmed.includes("youtu.be")) {
+      if (!lower.includes("youtube.com") && !lower.includes("youtu.be")) {
         setErrorMsg("Please enter a valid YouTube link.");
         return;
       }
     } else {
-      if (!trimmed.includes("instagram.com") && trimmed.includes("http")) {
+      if (!lower.includes("instagram.com") && lower.includes("http")) {
         setErrorMsg("Please enter a valid Instagram link.");
         return;
       }
@@ -551,36 +556,64 @@ export default function Home() {
 
     setErrorMsg("");
     setLoading(true);
-    setProgress(0);
+    setProgress(15);
     setResult(null);
 
-    // Simulate progress loader
-    const interval = setInterval(() => {
+    const connectingText = langCode === "hi" ? "सर्वर से कनेक्ट हो रहा है..." : "Connecting to media server...";
+    const parsingText = langCode === "hi" ? "मीडिया स्ट्रीम पार्स की जा रही है..." : "Parsing video stream...";
+    const fetchingText = langCode === "hi" ? "डाउनलोड विवरण प्राप्त हो रहे हैं..." : "Fetching download details...";
+
+    setLoadingText(connectingText);
+
+    // Smooth progress simulation while backend extracts
+    const progressTimer = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setLoading(false);
-            setResult(MOCK_RESULTS[platform]);
-          }, 300);
-          return 100;
-        }
-
-        const next = prev + Math.floor(Math.random() * 25) + 12;
-        const currentProgress = Math.min(next, 100);
-
-        const dict = VOCABULARY[langCode] || VOCABULARY.en;
-        const connectingText = langCode === "ar" ? "جاري الاتصال..." : langCode === "es" ? "Conectando..." : "Connecting to CDN...";
-        const parsingText = langCode === "ar" ? "جاري معالجة الفيديو..." : langCode === "es" ? "Procesando..." : "Parsing video stream...";
-        const fetchingText = langCode === "ar" ? "جاري جلب الملفات..." : langCode === "es" ? "Obteniendo..." : "Fetching file details...";
-
-        if (currentProgress < 30) setLoadingText(connectingText);
-        else if (currentProgress < 65) setLoadingText(parsingText);
-        else setLoadingText(fetchingText);
-
-        return currentProgress;
+        if (prev < 80) return prev + Math.floor(Math.random() * 12) + 5;
+        return prev;
       });
-    }, 100);
+    }, 200);
+
+    try {
+      setTimeout(() => setLoadingText(parsingText), 600);
+      
+      const response = await fetch(`/api/py/extract?url=${encodeURIComponent(trimmed)}`);
+      const data = await response.json();
+
+      clearInterval(progressTimer);
+      setProgress(95);
+      setLoadingText(fetchingText);
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.detail || "Unable to extract media from this URL. Please ensure the link is public.");
+      }
+
+      setProgress(100);
+      setTimeout(() => {
+        setLoading(false);
+        setResult({
+          user: data.author || (platform === "instagram" ? "instagram_creator" : "youtube_creator"),
+          avatar: data.avatar || data.thumbnail,
+          type: data.type === "video" ? "Video Media" : "Image Media",
+          title: data.title,
+          download_url: data.download_url,
+          options: data.options || [],
+          items: [
+            {
+              id: "1",
+              type: data.type,
+              url: data.thumbnail || data.avatar,
+              tag: data.title,
+              download_url: data.download_url,
+            }
+          ]
+        });
+      }, 300);
+
+    } catch (err: any) {
+      clearInterval(progressTimer);
+      setLoading(false);
+      setErrorMsg(err.message || "Failed to download media. Please ensure the Python backend is running.");
+    }
   };
 
   const handlePaste = async () => {
@@ -610,8 +643,27 @@ export default function Home() {
     triggerSearchDirect(inputUrl);
   };
 
-  const triggerDownloadAction = (itemName: string) => {
-    alert(`LX-Downloader mock download trigger: "${itemName}" is being saved to your device in High Definition.`);
+  const triggerDownloadAction = (downloadUrl?: string, filename?: string) => {
+    const url = downloadUrl || result?.download_url || result?.items?.[0]?.download_url;
+    if (!url) {
+      alert("Download stream link is currently processing. Please try again.");
+      return;
+    }
+    
+    const title = filename || result?.title || result?.items?.[0]?.tag || "LX_Media_Download";
+    const ext = url.includes(".jpg") || url.includes(".png") || result?.type?.toLowerCase().includes("image") ? "jpg" : "mp4";
+    const cleanFilename = `${title.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50)}.${ext}`;
+    
+    // Call the Python backend proxy endpoint to force native attachment download
+    const proxyDownloadUrl = `/api/py/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanFilename)}`;
+    
+    const link = document.createElement("a");
+    link.href = proxyDownloadUrl;
+    link.download = cleanFilename;
+    link.target = "_blank";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Get active localization vocabulary
@@ -938,7 +990,7 @@ export default function Home() {
                   {/* PROMINENT START DOWNLOADING BUTTON */}
                   <div className="pt-4 border-t border-slate-100">
                     <button
-                      onClick={() => triggerDownloadAction(result.items[0]?.tag || "LX Media")}
+                      onClick={() => triggerDownloadAction(result.download_url, result.title)}
                       className="w-full py-4.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 text-white font-black text-sm sm:text-base tracking-wider hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 group"
                     >
                       <Download className="w-5.5 h-5.5 group-hover:translate-y-0.5 transition-transform" />
@@ -948,13 +1000,13 @@ export default function Home() {
                     {/* Mirror links */}
                     <div className="flex gap-2 mt-3">
                       <button
-                        onClick={() => triggerDownloadAction((result.items[0]?.tag || "LX Media") + " (Server 2)")}
+                        onClick={() => triggerDownloadAction(result.options?.[0]?.url || result.download_url, (result.title || "Media") + "_HD")}
                         className="w-1/2 py-2.5 rounded-xl bg-slate-105 hover:bg-slate-200 text-slate-650 text-xs font-bold transition-all cursor-pointer active:scale-95 text-center border-0"
                       >
                         {d.mirrorBtn} (HD)
                       </button>
                       <button
-                        onClick={() => triggerDownloadAction((result.items[0]?.tag || "LX Media") + " (Server 3)")}
+                        onClick={() => triggerDownloadAction(result.options?.[1]?.url || result.download_url, (result.title || "Media") + "_SD")}
                         className="w-1/2 py-2.5 rounded-xl bg-slate-105 hover:bg-slate-200 text-slate-655 text-xs font-bold transition-all cursor-pointer active:scale-95 text-center border-0"
                       >
                         {d.mirrorBtn} (SD)
