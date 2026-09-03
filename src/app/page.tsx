@@ -506,6 +506,9 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [loadingText, setLoadingText] = useState("Analyzing Link...");
   const [result, setResult] = useState<any>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadingOption, setDownloadingOption] = useState<string | null>(null);
+  const [showIframePreview, setShowIframePreview] = useState(false);
   
   // Set first FAQ open by default (index 0) matching user screenshot
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -526,12 +529,27 @@ export default function Home() {
     return () => window.removeEventListener("popstate", parseLang);
   }, [pathname]);
 
-  // Clear states when subTab changes
-  useEffect(() => {
+  const handlePlatformClick = (newPlatform: "instagram" | "youtube") => {
+    setPlatform(newPlatform);
+    setSubTab(newPlatform === "youtube" ? "youtubeVideo" : "reels");
     setInputUrl("");
     setErrorMsg("");
     setResult(null);
-  }, [subTab]);
+  };
+
+  const handleSubTabClick = (tabId: string) => {
+    setSubTab(tabId);
+    setInputUrl("");
+    setErrorMsg("");
+    setResult(null);
+  };
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds || seconds <= 0) return "";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
+  };
 
   // Trigger real search extraction directly against the Python backend
   const triggerSearchDirect = async (url: string) => {
@@ -541,118 +559,39 @@ export default function Home() {
       return;
     }
     
-    // Strict category validation per active tab & subTab
+    // Smart auto-detection of platform and subTab
     const lower = trimmed.toLowerCase();
+    const isYt = lower.includes("youtube.com") || lower.includes("youtu.be");
+    const isIg = lower.includes("instagram.com");
 
-    if (platform === "youtube") {
-      if (!lower.includes("youtube.com") && !lower.includes("youtu.be")) {
-        setErrorMsg("Please enter a valid YouTube link.");
-        return;
+    if (isYt) {
+      if (platform !== "youtube") setPlatform("youtube");
+      if (lower.includes("/shorts/")) {
+        if (subTab !== "youtubeShorts") setSubTab("youtubeShorts");
+      } else {
+        if (subTab !== "youtubeVideo") setSubTab("youtubeVideo");
       }
-
-      if (subTab === "youtubeShorts") {
-        if (!lower.includes("/shorts/")) {
-          setErrorMsg("This is a standard YouTube Video link. Please select the 'Video' tab to download regular videos.");
-          return;
-        }
-      } else if (subTab === "youtubeVideo") {
-        if (lower.includes("/shorts/")) {
-          setErrorMsg("This is a YouTube Shorts link. Please select the 'Shorts' tab to download shorts.");
-          return;
-        }
-      }
-    } else {
-      // Instagram platform validation
-      if (!lower.includes("instagram.com") && lower.includes("http")) {
-        setErrorMsg("Please enter a valid Instagram link.");
-        return;
-      }
-
+    } else if (isIg) {
+      if (platform !== "instagram") setPlatform("instagram");
       const isReel = lower.includes("/reel/") || lower.includes("/reels/");
       const isPost = lower.includes("/p/");
       const isHighlight = lower.includes("/stories/highlights/") || lower.includes("/highlights/");
       const isStory = lower.includes("/stories/") && !isHighlight;
 
-      if (subTab === "reels") {
-        if (isPost) {
-          setErrorMsg("This is an Instagram Post link. Please switch to the 'Post' tab to download posts.");
-          return;
-        }
-        if (isStory) {
-          setErrorMsg("This is an Instagram Story link. Please switch to the 'Story' tab to download stories.");
-          return;
-        }
-        if (isHighlight) {
-          setErrorMsg("This is an Instagram Highlight link. Please switch to the 'Highlight' tab.");
-          return;
-        }
-        if (!isReel) {
-          setErrorMsg("Please enter a valid Instagram Reels link (e.g., https://www.instagram.com/reel/...).");
-          return;
-        }
-      } else if (subTab === "post") {
-        if (isReel) {
-          setErrorMsg("This is an Instagram Reel link. Please switch to the 'Reels' tab to download reels.");
-          return;
-        }
-        if (isStory) {
-          setErrorMsg("This is an Instagram Story link. Please switch to the 'Story' tab to download stories.");
-          return;
-        }
-        if (isHighlight) {
-          setErrorMsg("This is an Instagram Highlight link. Please switch to the 'Highlight' tab.");
-          return;
-        }
-        if (!isPost) {
-          setErrorMsg("Please enter a valid Instagram Post link (e.g., https://www.instagram.com/p/...).");
-          return;
-        }
-      } else if (subTab === "story") {
-        if (isReel) {
-          setErrorMsg("This is an Instagram Reel link. Please switch to the 'Reels' tab.");
-          return;
-        }
-        if (isPost) {
-          setErrorMsg("This is an Instagram Post link. Please switch to the 'Post' tab.");
-          return;
-        }
-        if (isHighlight) {
-          setErrorMsg("This is an Instagram Highlight link. Please switch to the 'Highlight' tab.");
-          return;
-        }
-        if (!isStory) {
-          setErrorMsg("Please enter a valid Instagram Story link (e.g., https://www.instagram.com/stories/username/...).");
-          return;
-        }
-      } else if (subTab === "highlight") {
-        if (isReel) {
-          setErrorMsg("This is an Instagram Reel link. Please switch to the 'Reels' tab.");
-          return;
-        }
-        if (isPost) {
-          setErrorMsg("This is an Instagram Post link. Please switch to the 'Post' tab.");
-          return;
-        }
-        if (isStory) {
-          setErrorMsg("This is an Instagram Story link. Please switch to the 'Story' tab.");
-          return;
-        }
-        if (!isHighlight) {
-          setErrorMsg("Please enter a valid Instagram Highlight link (e.g., https://www.instagram.com/stories/highlights/...).");
-          return;
-        }
-      } else if (subTab === "dp") {
-        if (isReel || isPost || isStory || isHighlight) {
-          setErrorMsg("This is a post/reel/story link. Please enter a profile link (e.g., https://www.instagram.com/username/) to download DP.");
-          return;
-        }
-      }
+      if (isReel && subTab !== "reels") setSubTab("reels");
+      else if (isPost && subTab !== "post") setSubTab("post");
+      else if (isHighlight && subTab !== "highlight") setSubTab("highlight");
+      else if (isStory && subTab !== "story") setSubTab("story");
+    } else {
+      setErrorMsg("Please enter a valid Instagram or YouTube link.");
+      return;
     }
 
     setErrorMsg("");
     setLoading(true);
     setProgress(15);
     setResult(null);
+    setShowIframePreview(false);
 
     const connectingText = langCode === "hi" ? "सर्वर से कनेक्ट हो रहा है..." : "Connecting to media server...";
     const parsingText = langCode === "hi" ? "मीडिया स्ट्रीम पार्स की जा रही है..." : "Parsing video stream...";
@@ -685,14 +624,16 @@ export default function Home() {
       setProgress(100);
       setTimeout(() => {
         setLoading(false);
+        setShowIframePreview(false);
         setResult({
-          platform: data.platform || platform,
+          platform: data.platform || (isYt ? "youtube" : "instagram"),
           video_id: data.video_id || "",
-          user: data.author || (platform === "instagram" ? "instagram_creator" : "youtube_creator"),
+          user: data.author || (isYt ? "YouTube Creator" : "Instagram Creator"),
           avatar: data.avatar || data.thumbnail,
           thumbnail: data.thumbnail || data.avatar || "",
           type: data.type || "video",
           title: data.title,
+          duration: data.duration,
           download_url: data.download_url,
           options: data.options || [],
           items: [
@@ -736,6 +677,7 @@ export default function Home() {
     setInputUrl("");
     setErrorMsg("");
     setResult(null);
+    setShowIframePreview(false);
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -745,6 +687,7 @@ export default function Home() {
     setResult(null);
     setInputUrl("");
     setErrorMsg("");
+    setShowIframePreview(false);
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -759,15 +702,18 @@ export default function Home() {
     triggerSearchDirect(inputUrl);
   };
 
-  const triggerDownloadAction = (downloadUrl?: string, filename?: string) => {
+  const triggerDownloadAction = (downloadUrl?: string, filename?: string, optId?: string) => {
     const url = downloadUrl || result?.download_url || result?.items?.[0]?.download_url;
     if (!url) {
       alert("Download stream link is currently processing. Please try again.");
       return;
     }
+
+    setDownloading(true);
+    if (optId) setDownloadingOption(optId);
     
     const title = filename || result?.title || result?.items?.[0]?.tag || "LX_Media_Download";
-    const ext = url.includes(".jpg") || url.includes(".png") || result?.type?.toLowerCase().includes("image") ? "jpg" : "mp4";
+    const ext = url.includes(".mp3") || optId === "audio" ? "mp3" : (url.includes(".jpg") || url.includes(".png") || result?.type?.toLowerCase().includes("image") ? "jpg" : "mp4");
     const cleanFilename = `${title.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50)}.${ext}`;
     
     // Call the Python backend proxy endpoint to force native attachment download
@@ -780,6 +726,12 @@ export default function Home() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    // Reset download button feedback after 3.5s
+    setTimeout(() => {
+      setDownloading(false);
+      setDownloadingOption(null);
+    }, 3500);
   };
 
   // Get active localization vocabulary
@@ -813,7 +765,7 @@ export default function Home() {
             
             {/* Instagram Tab */}
             <button
-              onClick={() => setPlatform("instagram")}
+              onClick={() => handlePlatformClick("instagram")}
               className={`relative py-4 sm:py-5 flex items-center justify-center gap-2 sm:gap-2.5 font-extrabold text-xs sm:text-base tracking-wide transition-all active:scale-[0.98] cursor-pointer outline-none z-10 ${
                 platform === "instagram" ? "text-blue-600" : "text-slate-500"
               }`}
@@ -832,7 +784,7 @@ export default function Home() {
 
             {/* YouTube Tab */}
             <button
-              onClick={() => setPlatform("youtube")}
+              onClick={() => handlePlatformClick("youtube")}
               className={`relative py-4 sm:py-5 flex items-center justify-center gap-2 sm:gap-2.5 font-extrabold text-xs sm:text-base tracking-wide transition-all active:scale-[0.98] cursor-pointer outline-none z-10 ${
                 platform === "youtube" ? "text-blue-600" : "text-slate-500"
               }`}
@@ -880,11 +832,11 @@ export default function Home() {
                       return (
                         <button
                           key={tab.id}
-                          onClick={() => setSubTab(tab.id)}
+                          onClick={() => handleSubTabClick(tab.id)}
                           className={`flex items-center justify-center gap-1.5 sm:gap-2 py-2 px-3 sm:py-3 sm:px-6 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
                             subTab === tab.id
                               ? "bg-white text-blue-600 shadow-md"
-                              : "bg-white/40 text-slate-650 hover:bg-white"
+                              : "bg-white/40 text-slate-600 hover:bg-white"
                           }`}
                         >
                           <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -910,11 +862,11 @@ export default function Home() {
                       return (
                         <button
                           key={tab.id}
-                          onClick={() => setSubTab(tab.id)}
+                          onClick={() => handleSubTabClick(tab.id)}
                           className={`flex items-center justify-center gap-1.5 sm:gap-2 py-2 px-4 sm:py-3 sm:px-6 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
                             subTab === tab.id
                               ? "bg-white text-blue-600 shadow-md"
-                              : "bg-white/40 text-slate-655 hover:bg-white"
+                              : "bg-white/40 text-slate-600 hover:bg-white"
                           }`}
                         >
                           <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -928,7 +880,7 @@ export default function Home() {
             </div>
 
             {/* Sub-tab Dynamic Title */}
-            <h2 className="text-lg sm:text-2xl font-black text-slate-905 mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-2xl font-black text-slate-900 mb-4 sm:mb-6">
               {desc.title}
             </h2>
 
@@ -1032,10 +984,10 @@ export default function Home() {
                       />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-xs font-black text-slate-855">{progress}%</span>
+                      <span className="text-xs font-black text-slate-800">{progress}%</span>
                     </div>
                   </div>
-                  <h3 className="text-xs font-bold text-slate-650 flex items-center gap-1.5">
+                  <h3 className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
                     <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
                     {loadingText}
                   </h3>
@@ -1054,14 +1006,55 @@ export default function Home() {
                 >
                   {/* Full Playable Video or Full Image Preview */}
                   {result.platform === "youtube" && result.video_id ? (
-                    <div className={`w-full ${subTab === "youtubeShorts" ? "max-w-[280px] sm:max-w-[320px] aspect-[9/16]" : "max-w-md aspect-video"} mx-auto rounded-2xl overflow-hidden bg-black shadow-lg relative`}>
-                      <iframe
-                        src={`https://www.youtube-nocookie.com/embed/${result.video_id}?rel=0&modestbranding=1`}
-                        title={result.title}
-                        className="w-full h-full border-0 rounded-2xl"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
+                    <div className="w-full flex flex-col items-center">
+                      {showIframePreview ? (
+                        <div className={`w-full ${subTab === "youtubeShorts" ? "max-w-[280px] sm:max-w-[320px] aspect-[9/16]" : "max-w-md aspect-video"} mx-auto rounded-2xl overflow-hidden bg-black shadow-lg relative`}>
+                          <iframe
+                            src={`https://www.youtube-nocookie.com/embed/${result.video_id}?autoplay=1&rel=0&modestbranding=1`}
+                            title={result.title}
+                            className="w-full h-full border-0 rounded-2xl"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        </div>
+                      ) : (
+                        <div 
+                          onClick={() => setShowIframePreview(true)}
+                          className={`group cursor-pointer w-full ${subTab === "youtubeShorts" ? "max-w-[280px] sm:max-w-[320px] aspect-[9/16]" : "max-w-md aspect-video"} mx-auto rounded-2xl overflow-hidden bg-slate-900 shadow-lg relative flex items-center justify-center`}
+                        >
+                          <img
+                            src={result.thumbnail || result.avatar || `https://i.ytimg.com/vi/${result.video_id}/hqdefault.jpg`}
+                            alt={result.title || "Video Preview"}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e: any) => {
+                              e.currentTarget.src = `https://i.ytimg.com/vi/${result.video_id}/hqdefault.jpg`;
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/35 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-blue-600/90 text-white flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
+                              <Play className="w-7 h-7 fill-current translate-x-0.5" />
+                            </div>
+                          </div>
+                          {result.duration ? (
+                            <div className="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-md bg-black/80 text-white text-xs font-bold tracking-wide">
+                              {formatDuration(result.duration)}
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+
+                      {/* Video Title & Channel Info */}
+                      <div className="mt-3 text-left w-full max-w-md px-1">
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 line-clamp-2 leading-snug">
+                          {result.title}
+                        </h3>
+                        {result.user && (
+                          <p className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-red-600 inline-block" />
+                            {result.user}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="w-full max-w-md rounded-2xl overflow-hidden bg-black shadow-lg flex items-center justify-center relative">
@@ -1087,22 +1080,40 @@ export default function Home() {
                   {/* Clean Solid Blue Download Now Button */}
                   <div className="w-full max-w-md flex flex-col gap-2.5">
                     <button
+                      disabled={downloading}
                       onClick={() => triggerDownloadAction(result.download_url, result.title)}
-                      className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm sm:text-base tracking-wider active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 group"
+                      className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-500 text-white font-black text-sm sm:text-base tracking-wider active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 group"
                     >
-                      <Download className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
-                      DOWNLOAD NOW
+                      {downloading && !downloadingOption ? (
+                        <>
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                          <span>PREPARING FULL HD VIDEO...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
+                          <span>DOWNLOAD NOW</span>
+                        </>
+                      )}
                     </button>
 
                     {/* Carousel Items or Additional Format Options */}
-                    {result.options && result.options.length > 1 && (
+                    {result.options && result.options.length > 0 && (
                       <div className="flex flex-wrap gap-2 pt-1 justify-center">
                         {result.options.map((opt: any) => (
                           <button
                             key={opt.id}
-                            onClick={() => triggerDownloadAction(opt.url, (result.title || "Media") + "_" + opt.id)}
-                            className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95 border border-slate-200"
+                            disabled={downloading}
+                            onClick={() => triggerDownloadAction(opt.url, (result.title || "Media") + "_" + opt.id, opt.id)}
+                            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 border flex items-center gap-1.5 ${
+                              downloadingOption === opt.id
+                                ? "bg-blue-600 text-white border-blue-600 shadow-md"
+                                : "bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 border-slate-200"
+                            }`}
                           >
+                            {downloadingOption === opt.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : null}
                             {opt.label}
                           </button>
                         ))}

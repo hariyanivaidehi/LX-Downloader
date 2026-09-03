@@ -1,14 +1,59 @@
+import os
 import re
 import html
+import glob
+import time
+import asyncio
 import urllib.parse
 from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 import httpx
 import requests
 import yt_dlp
+import imageio_ffmpeg
+
+import tempfile
+
+try:
+    FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
+except Exception:
+    FFMPEG_EXE = None
+
+if os.environ.get("VERCEL"):
+    CACHE_DIR = os.path.join(tempfile.gettempdir(), "downloads_cache")
+else:
+    CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads_cache")
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+
+def cleanup_cache(max_age_seconds: int = 3600):
+    """Remove cached downloads older than 1 hour to prevent disk bloat."""
+    try:
+        now = time.time()
+        for f in glob.glob(os.path.join(CACHE_DIR, "*")):
+            if os.path.isfile(f) and (now - os.path.getmtime(f)) > max_age_seconds:
+                try:
+                    os.remove(f)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+def get_ydl_base_opts() -> Dict[str, Any]:
+    """Base options for yt-dlp to solve challenges and use local ffmpeg."""
+    opts: Dict[str, Any] = {
+        "quiet": True,
+        "no_warnings": True,
+        "remote_components": ["ejs:github"],
+        "js_runtimes": {"node": {}},
+    }
+    if FFMPEG_EXE:
+        opts["ffmpeg_location"] = FFMPEG_EXE
+    return opts
 
 app = FastAPI(
     title="LX-Downloader API",
@@ -46,81 +91,119 @@ def sanitize_filename(name: str, ext: str = "mp4") -> str:
     return f"{clean}.{ext}"
 
 
+def download_youtube_media(video_id: str, quality: str = "720p") -> str:
+    """Download and merge YouTube media into cache, applying faststart moov flags."""
+    cleanup_cache()
+    ext = "mp3" if quality == "audio" else "mp4"
+    target_path = os.path.join(CACHE_DIR, f"{video_id}_{quality}.{ext}")
+
+    # If already cached and valid (>1KB), return it immediately
+    if os.path.exists(target_path) and os.path.getsize(target_path) > 1024:
+        return target_path
+
+    opts = get_ydl_base_opts()
+
+    if quality == "audio":
+        opts.update({
+            "format": "bestaudio/best",
+            "outtmpl": os.path.join(CACHE_DIR, f"{video_id}_{quality}.%(ext)s"),
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }],
+        })
+    else:
+        if quality == "1080p":
+            format_spec = "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
+        elif quality == "360p":
+            format_spec = "bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=360]+bestaudio/best[height<=360]/best"
+        else:  # 720p or default
+            format_spec = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best"
+
+        opts.update({
+            "format": format_spec,
+            "outtmpl": os.path.join(CACHE_DIR, f"{video_id}_{quality}.%(ext)s"),
+            "merge_output_format": "mp4",
+            "postprocessor_args": {"merger": ["-movflags", "+faststart"]},
+        })
+
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
+
+    if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
+        return target_path
+
+    # Fallback search for created file
+    matches = glob.glob(os.path.join(CACHE_DIR, f"{video_id}_{quality}.*"))
+    for m in matches:
+        if not m.endswith(".part") and os.path.getsize(m) > 0:
+            return m
+
+    raise RuntimeError("YouTube media download failed to produce a valid output file.")
+
+
 def extract_youtube(url: str) -> Dict[str, Any]:
     """Extract YouTube video or Short details using yt-dlp."""
-    # Clean up tracking params
     clean_url = url.strip()
-    
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-    }
-    
+    ydl_opts = get_ydl_base_opts()
+    ydl_opts["skip_download"] = True
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(clean_url, download=False)
-            
-            title = info.get("title", "YouTube Video")
-            author = info.get("uploader", info.get("channel", "YouTube Creator"))
-            thumbnail = info.get("thumbnail", "")
-            duration = info.get("duration", 0)
-            
-            formats = info.get("formats", [])
-            download_options = []
-            direct_download_url = ""
-            
-            # Find best MP4 with video+audio, or best video stream
-            mp4_formats = [f for f in formats if f.get("ext") == "mp4" and f.get("url")]
-            
-            # 1. Combined formats (both video and audio)
-            progressive = [
-                f for f in mp4_formats 
-                if f.get("vcodec") != "none" and f.get("acodec") != "none"
-            ]
-            
-            if progressive:
-                best_prog = progressive[-1]
-                direct_download_url = best_prog["url"]
-                for f in reversed(progressive):
-                    res = f.get("resolution") or f"{f.get('height')}p" or "Standard"
-                    download_options.append({
-                        "id": f.get("format_id", "mp4"),
-                        "label": f"MP4 Video ({res})",
-                        "ext": "mp4",
-                        "url": f["url"],
-                        "filesize": f.get("filesize") or f.get("filesize_approx")
-                    })
-            else:
-                # If only separate streams, grab best available MP4 format
-                if mp4_formats:
-                    direct_download_url = mp4_formats[-1]["url"]
-                    download_options.append({
-                        "id": "best_mp4",
-                        "label": f"MP4 Video ({mp4_formats[-1].get('resolution') or 'HD'})",
-                        "ext": "mp4",
-                        "url": mp4_formats[-1]["url"],
-                        "filesize": mp4_formats[-1].get("filesize")
-                    })
 
-            # Also provide direct audio option if available
-            audio_formats = [f for f in formats if f.get("vcodec") == "none" and f.get("url")]
-            if audio_formats:
-                best_audio = audio_formats[-1]
-                download_options.append({
-                    "id": "audio",
-                    "label": f"Audio ({best_audio.get('ext', 'm4a').upper()})",
-                    "ext": best_audio.get("ext", "m4a"),
-                    "url": best_audio["url"],
-                    "filesize": best_audio.get("filesize")
-                })
-                
-            if not direct_download_url and formats:
-                direct_download_url = formats[-1].get("url", "")
-                
+            title = info.get("title", "YouTube Video")
+            author = info.get("uploader") or info.get("channel") or "YouTube Creator"
             video_id = info.get("id") or ""
-            if not thumbnail and video_id:
+            duration = info.get("duration", 0)
+
+            # High-res thumbnail with reliable fallback
+            thumbnail = info.get("thumbnail") or f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+            if video_id and not thumbnail.startswith("http"):
                 thumbnail = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+
+            formats = info.get("formats", [])
+            heights = set(f.get("height") for f in formats if f.get("height"))
+
+            download_options = []
+
+            # 1080p Full HD
+            if any(h and h >= 1080 for h in heights):
+                download_options.append({
+                    "id": "1080p",
+                    "label": "Full HD Video (1080p)",
+                    "ext": "mp4",
+                    "url": f"https://www.youtube.com/watch?v={video_id}&quality=1080p",
+                })
+
+            # 720p HD
+            if any(h and h >= 720 for h in heights) or not download_options:
+                download_options.append({
+                    "id": "720p",
+                    "label": "HD Video (720p)",
+                    "ext": "mp4",
+                    "url": f"https://www.youtube.com/watch?v={video_id}&quality=720p",
+                })
+
+            # 360p Standard
+            download_options.append({
+                "id": "360p",
+                "label": "Standard Video (360p)",
+                "ext": "mp4",
+                "url": f"https://www.youtube.com/watch?v={video_id}&quality=360p",
+            })
+
+            # Audio MP3
+            download_options.append({
+                "id": "audio",
+                "label": "High Quality Audio (MP3)",
+                "ext": "mp3",
+                "url": f"https://www.youtube.com/watch?v={video_id}&quality=audio",
+            })
+
+            default_quality = "720p" if any(opt["id"] == "720p" for opt in download_options) else "360p"
+            direct_download_url = f"https://www.youtube.com/watch?v={video_id}&quality={default_quality}"
 
             return {
                 "success": True,
@@ -129,7 +212,7 @@ def extract_youtube(url: str) -> Dict[str, Any]:
                 "video_id": video_id,
                 "title": title,
                 "author": author,
-                "avatar": thumbnail,
+                "avatar": f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
                 "thumbnail": thumbnail,
                 "duration": duration,
                 "download_url": direct_download_url,
@@ -331,41 +414,109 @@ def extract_media(url: str = Query(..., description="The media URL to extract"))
 
 @app.get("/api/download")
 async def download_file(
-    url: str = Query(..., description="Direct media stream URL to proxy download"),
+    url: Optional[str] = Query(None, description="Direct media stream URL or YouTube link"),
+    video_id: Optional[str] = Query(None, description="YouTube Video ID"),
+    quality: Optional[str] = Query(None, description="Desired quality: 1080p, 720p, 360p, audio"),
+    source: Optional[str] = Query(None, description="Platform source: youtube, instagram"),
     filename: Optional[str] = Query("download.mp4", description="Desired filename for saving"),
 ):
     """
-    Stream download proxy to bypass CORS and force the browser to trigger
-    a native file save dialog with the Content-Disposition attachment header.
+    Download handler with dual mode:
+    1. For YouTube: downloads and merges video+audio with faststart MP4 flags, served with exact Content-Length.
+    2. For Instagram / CDN: streams media with full connection reliability and exact headers.
     """
-    if not url:
+    raw_url = (url or "").strip()
+    is_yt = (
+        source == "youtube"
+        or bool(video_id)
+        or "youtube.com" in raw_url.lower()
+        or "youtu.be" in raw_url.lower()
+        or "googlevideo.com" in raw_url.lower()
+    )
+
+    if is_yt:
+        target_vid = video_id
+        parsed_quality = quality
+        if raw_url:
+            parsed = urllib.parse.urlparse(raw_url)
+            params = urllib.parse.parse_qs(parsed.query)
+            if not target_vid:
+                if "v" in params:
+                    target_vid = params["v"][0]
+                elif "/shorts/" in raw_url:
+                    target_vid = raw_url.split("/shorts/")[1].split("?")[0].split("/")[0]
+                elif "youtu.be/" in raw_url:
+                    target_vid = raw_url.split("youtu.be/")[1].split("?")[0].split("/")[0]
+                elif "video_id" in params:
+                    target_vid = params["video_id"][0]
+            if not parsed_quality and "quality" in params:
+                parsed_quality = params["quality"][0]
+
+        if not target_vid:
+            raise HTTPException(status_code=400, detail="Could not determine YouTube video ID.")
+
+        chosen_quality = (parsed_quality or "720p").lower()
+        ext = "mp3" if chosen_quality == "audio" else "mp4"
+        safe_name = sanitize_filename(filename.rsplit(".", 1)[0], ext=ext)
+
+        try:
+            file_path = await asyncio.to_thread(download_youtube_media, target_vid, chosen_quality)
+            media_type = "audio/mpeg" if ext == "mp3" else "video/mp4"
+            return FileResponse(
+                file_path,
+                media_type=media_type,
+                filename=safe_name,
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Accept-Ranges": "bytes",
+                }
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to process YouTube download: {str(e)}")
+
+    # Handle Instagram / Direct CDN Streams
+    if not raw_url:
         raise HTTPException(status_code=400, detail="Missing download URL.")
 
-    # Determine extension
-    ext = "mp4" if ".mp4" in url or filename.endswith(".mp4") else "jpg"
+    ext = "mp4" if ".mp4" in raw_url or filename.endswith(".mp4") else "jpg"
     safe_name = sanitize_filename(filename.rsplit(".", 1)[0], ext=ext)
 
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://www.instagram.com/" if "instagram" in raw_url or "fbcdn" in raw_url else "https://www.google.com/",
+    }
+
+    client = httpx.AsyncClient(follow_redirects=True, timeout=httpx.Timeout(None, connect=30.0))
+    content_length = None
+    try:
+        head_resp = await client.head(raw_url, headers=headers)
+        content_length = head_resp.headers.get("content-length")
+    except Exception:
+        pass
+
     async def stream_generator():
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Referer": "https://www.instagram.com/" if "instagram" in url or "fbcdn" in url else "https://www.youtube.com/",
-        }
-        async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
-            async with client.stream("GET", url, headers=headers) as response:
+        try:
+            async with client.stream("GET", raw_url, headers=headers) as response:
                 if response.status_code >= 400:
                     raise HTTPException(status_code=response.status_code, detail="Failed to fetch media stream from source.")
                 async for chunk in response.aiter_bytes(chunk_size=65536):
                     yield chunk
+        finally:
+            await client.aclose()
 
     media_type = "video/mp4" if ext == "mp4" else "image/jpeg"
-    
+    resp_headers = {
+        "Content-Disposition": f'attachment; filename="{safe_name}"',
+        "Cache-Control": "no-cache",
+        "Accept-Ranges": "bytes",
+    }
+    if content_length:
+        resp_headers["Content-Length"] = content_length
+
     return StreamingResponse(
         stream_generator(),
         media_type=media_type,
-        headers={
-            "Content-Disposition": f'attachment; filename="{safe_name}"',
-            "Cache-Control": "no-cache",
-        },
+        headers=resp_headers,
     )
 
 

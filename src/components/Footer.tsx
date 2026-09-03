@@ -168,7 +168,7 @@ export default function Footer() {
   const t = translations[currentLang] || translations.en;
 
   return (
-    <footer className="bg-slate-50 text-slate-555 border-t border-slate-100">
+    <footer className="bg-slate-50 text-slate-500 border-t border-slate-100">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 text-center space-y-8">
         
         {/* Brand Logo */}
