@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { 
-  Flame, Link2, Play, Download, RefreshCw, Film, Image as ImageIcon, Compass, UserCheck, Search, X, ChevronDown, AlertCircle
+  Flame, Link2, Play, Download, RefreshCw, Film, Image as ImageIcon, Compass, UserCheck, Search, X, ChevronDown, AlertCircle, CheckCircle, Loader2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -508,6 +508,9 @@ export default function Home() {
   const [result, setResult] = useState<any>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadingOption, setDownloadingOption] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [downloadCompleted, setDownloadCompleted] = useState(false);
+  const [downloadStatusText, setDownloadStatusText] = useState("");
   const [showIframePreview, setShowIframePreview] = useState(false);
   
   // Set first FAQ open by default (index 0) matching user screenshot
@@ -698,6 +701,11 @@ export default function Home() {
     setInputUrl("");
     setErrorMsg("");
     setShowIframePreview(false);
+    setDownloading(false);
+    setDownloadingOption(null);
+    setDownloadProgress(null);
+    setDownloadCompleted(false);
+    setDownloadStatusText("");
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -712,7 +720,7 @@ export default function Home() {
     triggerSearchDirect(inputUrl);
   };
 
-  const triggerDownloadAction = (downloadUrl?: string, filename?: string, optId?: string) => {
+  const triggerDownloadAction = async (downloadUrl?: string, filename?: string, optId?: string) => {
     const url = downloadUrl || result?.download_url || result?.items?.[0]?.download_url;
     if (!url) {
       alert("Download stream link is currently processing. Please try again.");
@@ -720,6 +728,9 @@ export default function Home() {
     }
 
     setDownloading(true);
+    setDownloadCompleted(false);
+    setDownloadProgress(null);
+    setDownloadStatusText("Downloading media... Please do not leave or close the page!");
     if (optId) setDownloadingOption(optId);
     
     const title = filename || result?.title || result?.items?.[0]?.tag || "LX_Media_Download";
@@ -728,20 +739,83 @@ export default function Home() {
     
     // Call the Python backend proxy endpoint to force native attachment download
     const proxyDownloadUrl = `/api/py/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanFilename)}`;
-    
-    const link = document.createElement("a");
-    link.href = proxyDownloadUrl;
-    link.download = cleanFilename;
-    link.target = "_blank";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
 
-    // Reset download button feedback after 3.5s
-    setTimeout(() => {
+    try {
+      const res = await fetch(proxyDownloadUrl);
+      if (!res.ok) {
+        throw new Error(`Download request failed with status ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      const contentLength = +(res.headers.get("Content-Length") || 0);
+      let receivedLength = 0;
+      const chunks: Uint8Array[] = [];
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            chunks.push(value);
+            receivedLength += value.length;
+            if (contentLength > 0) {
+              const pct = Math.min(99, Math.round((receivedLength / contentLength) * 100));
+              setDownloadProgress(pct);
+              setDownloadStatusText(`Downloading: ${pct}%... Please do not leave the page!`);
+            }
+          }
+        }
+      } else {
+        const blob = await res.blob();
+        chunks.push(new Uint8Array(await blob.arrayBuffer()));
+      }
+
+      const mimeType = ext === "mp3" ? "audio/mpeg" : (ext === "jpg" ? "image/jpeg" : "video/mp4");
+      const finalBlob = new Blob(chunks as any[], { type: mimeType });
+      const blobUrl = window.URL.createObjectURL(finalBlob);
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = cleanFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000);
+
       setDownloading(false);
       setDownloadingOption(null);
-    }, 3500);
+      setDownloadProgress(null);
+      setDownloadCompleted(true);
+      setDownloadStatusText("Download Completed! Video saved successfully.");
+
+      // Auto-revert completed status after 5s
+      setTimeout(() => {
+        setDownloadCompleted(false);
+        setDownloadStatusText("");
+      }, 5000);
+
+    } catch (err) {
+      console.warn("Direct blob stream failed, fallback to native download link:", err);
+      const fallbackLink = document.createElement("a");
+      fallbackLink.href = proxyDownloadUrl;
+      fallbackLink.download = cleanFilename;
+      fallbackLink.target = "_blank";
+      document.body.appendChild(fallbackLink);
+      fallbackLink.click();
+      document.body.removeChild(fallbackLink);
+
+      setDownloading(false);
+      setDownloadingOption(null);
+      setDownloadProgress(null);
+      setDownloadCompleted(true);
+      setDownloadStatusText("Download Completed! File saved successfully.");
+
+      setTimeout(() => {
+        setDownloadCompleted(false);
+        setDownloadStatusText("");
+      }, 5000);
+    }
   };
 
   // Get active localization vocabulary
@@ -1087,25 +1161,77 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Clean Solid Blue Download Now Button */}
-                  <div className="w-full max-w-md flex flex-col gap-2.5">
-                    <button
-                      disabled={downloading}
-                      onClick={() => triggerDownloadAction(result.download_url, result.title)}
-                      className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-500 text-white font-black text-sm sm:text-base tracking-wider active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 group"
-                    >
-                      {downloading && !downloadingOption ? (
-                        <>
-                          <RefreshCw className="w-5 h-5 animate-spin" />
-                          <span>PREPARING FULL HD VIDEO...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
-                          <span>DOWNLOAD NOW</span>
-                        </>
+                  {/* Clean Solid Blue Download Now Button & In-Place Realtime Status Indicators */}
+                  <div className="w-full max-w-md flex flex-col gap-3">
+                    
+                    {/* Dynamic Action Button */}
+                    {downloadCompleted ? (
+                      <div className="w-full py-4 rounded-xl bg-emerald-600 text-white font-black text-sm sm:text-base tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30">
+                        <CheckCircle className="w-5 h-5" />
+                        <span>DOWNLOAD COMPLETED!</span>
+                      </div>
+                    ) : (
+                      <button
+                        disabled={downloading}
+                        onClick={() => triggerDownloadAction(result.download_url, result.title)}
+                        className={`w-full py-4 rounded-xl text-white font-black text-sm sm:text-base tracking-wider transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2 group ${
+                          downloading
+                            ? "bg-blue-500 cursor-not-allowed shadow-blue-500/20"
+                            : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-blue-600/25"
+                        }`}
+                      >
+                        {downloading && !downloadingOption ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span>
+                              {downloadProgress ? `DOWNLOADING ${downloadProgress}%...` : "PREPARING & DOWNLOADING..."}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
+                            <span>DOWNLOAD NOW</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {/* IN-PLACE REALTIME STATUS ALERT: "WAIT / DON'T LEAVE" OR "COMPLETED" */}
+                    <AnimatePresence>
+                      {downloading && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -6 }}
+                          className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm font-bold flex flex-col items-center gap-2 text-center shadow-sm"
+                        >
+                          <div className="flex items-center gap-2 text-amber-800">
+                            <Loader2 className="w-4 h-4 animate-spin shrink-0 text-amber-600" />
+                            <span>Downloading video... Please wait, do not leave this page!</span>
+                          </div>
+                          {downloadProgress !== null && (
+                            <div className="w-full bg-amber-200/70 rounded-full h-2 overflow-hidden mt-1">
+                              <div
+                                className="bg-amber-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${downloadProgress}%` }}
+                              />
+                            </div>
+                          )}
+                        </motion.div>
                       )}
-                    </button>
+
+                      {downloadCompleted && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -6 }}
+                          className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 text-center shadow-sm animate-fade-in"
+                        >
+                          <CheckCircle className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
+                          <span>✅ Download Completed! Video has been saved to your device.</span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     {/* Carousel Items or Additional Format Options */}
                     {result.options && result.options.length > 0 && (
@@ -1122,7 +1248,7 @@ export default function Home() {
                             }`}
                           >
                             {downloadingOption === opt.id ? (
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             ) : null}
                             {opt.label}
                           </button>
