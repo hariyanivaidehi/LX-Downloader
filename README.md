@@ -74,10 +74,17 @@ Built with **Next.js 16 (Turbopack)** and a robust **Python FastAPI** backend po
   - Success banner upon completion: `✅ Download Completed! Video has been saved to your device.`
   - Dynamic button switching to **`DOWNLOAD AGAIN`** after completion.
   - Prominent, easy-to-use **`Clear Result`** action button.
+- **Rich Media Preview Card**:
+  - HD thumbnail cover with video duration badge and channel info.
+  - One-click glowing play button overlay to switch to the interactive player.
+  - Adaptive aspect ratio: 9:16 for Shorts and 16:9 for standard videos.
 - **100% Fully Responsive Layout**: Tailored for mobile smartphones (iPhone, Android), tablets, and desktops with zero horizontal overflow.
 - **Multi-Language Regional Localization**: Real-time client-side switching with zero page refresh across 7 regional Indian languages:
   - English 🇬🇧 | हिन्दी (Hindi) 🇮🇳 | বাংলা (Bengali) 🇮🇳 | తెలుగు (Telugu) 🇮🇳 | ಕನ್ನಡ (Kannada) 🇮🇳 | മലയാളം (Malayalam) 🇮🇳 | मराठी (Marathi) 🇮🇳
 - **Smart Link Auto-Detection**: Pasting a YouTube link or Instagram link automatically switches to the correct platform and sub-tab without throwing validation errors.
+- **Interactive FAQ & Step-by-Step Guide**: Accordion-style help center and intuitive 3-step walkthrough customized for each media type.
+- **Sticky Glassmorphic Navbar**: Always-accessible header with blur backdrop and quick language switcher.
+- **One-Tap Social Sharing**: Share tools on WhatsApp, Telegram, Facebook, and Instagram directly from the footer.
 
 ---
 
