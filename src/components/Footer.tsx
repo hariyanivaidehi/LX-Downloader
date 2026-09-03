@@ -269,7 +269,7 @@ export default function Footer() {
                 </a>
                 <span className="text-slate-300">|</span>
                 <a 
-                  href="https://linkedin.com/in/yagnikhariyani" 
+                  href="https://www.linkedin.com/in/yagnik-hariyani-318620297" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 font-bold transition-colors"
@@ -298,7 +298,7 @@ export default function Footer() {
                 </a>
                 <span className="text-slate-300">|</span>
                 <a 
-                  href="https://linkedin.com/in/vaidehihariyani" 
+                  href="https://www.linkedin.com/in/vaidehi-hariyani-15b0a4381" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 font-bold transition-colors"
