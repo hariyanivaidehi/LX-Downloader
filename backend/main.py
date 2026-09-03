@@ -118,10 +118,15 @@ def extract_youtube(url: str) -> Dict[str, Any]:
             if not direct_download_url and formats:
                 direct_download_url = formats[-1].get("url", "")
                 
+            video_id = info.get("id") or ""
+            if not thumbnail and video_id:
+                thumbnail = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+
             return {
                 "success": True,
                 "platform": "youtube",
                 "type": "video",
+                "video_id": video_id,
                 "title": title,
                 "author": author,
                 "avatar": thumbnail,

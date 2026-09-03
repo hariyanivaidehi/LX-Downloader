@@ -541,17 +541,111 @@ export default function Home() {
       return;
     }
     
-    // Quick validation
+    // Strict category validation per active tab & subTab
     const lower = trimmed.toLowerCase();
+
     if (platform === "youtube") {
       if (!lower.includes("youtube.com") && !lower.includes("youtu.be")) {
         setErrorMsg("Please enter a valid YouTube link.");
         return;
       }
+
+      if (subTab === "youtubeShorts") {
+        if (!lower.includes("/shorts/")) {
+          setErrorMsg("This is a standard YouTube Video link. Please select the 'Video' tab to download regular videos.");
+          return;
+        }
+      } else if (subTab === "youtubeVideo") {
+        if (lower.includes("/shorts/")) {
+          setErrorMsg("This is a YouTube Shorts link. Please select the 'Shorts' tab to download shorts.");
+          return;
+        }
+      }
     } else {
+      // Instagram platform validation
       if (!lower.includes("instagram.com") && lower.includes("http")) {
         setErrorMsg("Please enter a valid Instagram link.");
         return;
+      }
+
+      const isReel = lower.includes("/reel/") || lower.includes("/reels/");
+      const isPost = lower.includes("/p/");
+      const isHighlight = lower.includes("/stories/highlights/") || lower.includes("/highlights/");
+      const isStory = lower.includes("/stories/") && !isHighlight;
+
+      if (subTab === "reels") {
+        if (isPost) {
+          setErrorMsg("This is an Instagram Post link. Please switch to the 'Post' tab to download posts.");
+          return;
+        }
+        if (isStory) {
+          setErrorMsg("This is an Instagram Story link. Please switch to the 'Story' tab to download stories.");
+          return;
+        }
+        if (isHighlight) {
+          setErrorMsg("This is an Instagram Highlight link. Please switch to the 'Highlight' tab.");
+          return;
+        }
+        if (!isReel) {
+          setErrorMsg("Please enter a valid Instagram Reels link (e.g., https://www.instagram.com/reel/...).");
+          return;
+        }
+      } else if (subTab === "post") {
+        if (isReel) {
+          setErrorMsg("This is an Instagram Reel link. Please switch to the 'Reels' tab to download reels.");
+          return;
+        }
+        if (isStory) {
+          setErrorMsg("This is an Instagram Story link. Please switch to the 'Story' tab to download stories.");
+          return;
+        }
+        if (isHighlight) {
+          setErrorMsg("This is an Instagram Highlight link. Please switch to the 'Highlight' tab.");
+          return;
+        }
+        if (!isPost) {
+          setErrorMsg("Please enter a valid Instagram Post link (e.g., https://www.instagram.com/p/...).");
+          return;
+        }
+      } else if (subTab === "story") {
+        if (isReel) {
+          setErrorMsg("This is an Instagram Reel link. Please switch to the 'Reels' tab.");
+          return;
+        }
+        if (isPost) {
+          setErrorMsg("This is an Instagram Post link. Please switch to the 'Post' tab.");
+          return;
+        }
+        if (isHighlight) {
+          setErrorMsg("This is an Instagram Highlight link. Please switch to the 'Highlight' tab.");
+          return;
+        }
+        if (!isStory) {
+          setErrorMsg("Please enter a valid Instagram Story link (e.g., https://www.instagram.com/stories/username/...).");
+          return;
+        }
+      } else if (subTab === "highlight") {
+        if (isReel) {
+          setErrorMsg("This is an Instagram Reel link. Please switch to the 'Reels' tab.");
+          return;
+        }
+        if (isPost) {
+          setErrorMsg("This is an Instagram Post link. Please switch to the 'Post' tab.");
+          return;
+        }
+        if (isStory) {
+          setErrorMsg("This is an Instagram Story link. Please switch to the 'Story' tab.");
+          return;
+        }
+        if (!isHighlight) {
+          setErrorMsg("Please enter a valid Instagram Highlight link (e.g., https://www.instagram.com/stories/highlights/...).");
+          return;
+        }
+      } else if (subTab === "dp") {
+        if (isReel || isPost || isStory || isHighlight) {
+          setErrorMsg("This is a post/reel/story link. Please enter a profile link (e.g., https://www.instagram.com/username/) to download DP.");
+          return;
+        }
       }
     }
 
@@ -592,9 +686,12 @@ export default function Home() {
       setTimeout(() => {
         setLoading(false);
         setResult({
+          platform: data.platform || platform,
+          video_id: data.video_id || "",
           user: data.author || (platform === "instagram" ? "instagram_creator" : "youtube_creator"),
           avatar: data.avatar || data.thumbnail,
-          type: data.type === "video" ? "Video Media" : "Image Media",
+          thumbnail: data.thumbnail || data.avatar || "",
+          type: data.type || "video",
           title: data.title,
           download_url: data.download_url,
           options: data.options || [],
@@ -956,24 +1053,36 @@ export default function Home() {
                   className="mt-8 p-4 sm:p-6 bg-white rounded-3xl text-center max-w-lg mx-auto shadow-2xl shadow-slate-100 flex flex-col items-center gap-5"
                 >
                   {/* Full Playable Video or Full Image Preview */}
-                  <div className="w-full max-w-md rounded-2xl overflow-hidden bg-black shadow-lg flex items-center justify-center relative">
-                    {result.type === "video" || result.download_url?.includes(".mp4") ? (
-                      <video
-                        src={result.download_url}
-                        poster={result.avatar || result.thumbnail || result.items?.[0]?.url}
-                        controls
-                        playsInline
-                        preload="metadata"
-                        className="w-full max-h-[540px] object-contain mx-auto"
+                  {result.platform === "youtube" && result.video_id ? (
+                    <div className={`w-full ${subTab === "youtubeShorts" ? "max-w-[280px] sm:max-w-[320px] aspect-[9/16]" : "max-w-md aspect-video"} mx-auto rounded-2xl overflow-hidden bg-black shadow-lg relative`}>
+                      <iframe
+                        src={`https://www.youtube-nocookie.com/embed/${result.video_id}?rel=0&modestbranding=1`}
+                        title={result.title}
+                        className="w-full h-full border-0 rounded-2xl"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
                       />
-                    ) : (
-                      <img
-                        src={result.download_url || result.items?.[0]?.url}
-                        alt="Media Preview"
-                        className="w-full max-h-[540px] object-contain mx-auto"
-                      />
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="w-full max-w-md rounded-2xl overflow-hidden bg-black shadow-lg flex items-center justify-center relative">
+                      {result.type === "video" || result.download_url?.includes(".mp4") ? (
+                        <video
+                          src={result.download_url}
+                          poster={result.thumbnail || result.avatar}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          className="w-full max-h-[540px] object-contain mx-auto"
+                        />
+                      ) : (
+                        <img
+                          src={result.download_url || result.thumbnail || result.avatar}
+                          alt="Media Preview"
+                          className="w-full max-h-[540px] object-contain mx-auto"
+                        />
+                      )}
+                    </div>
+                  )}
 
                   {/* Clean Solid Blue Download Now Button */}
                   <div className="w-full max-w-md flex flex-col gap-2.5">
