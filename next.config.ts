@@ -14,11 +14,31 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8000";
+    const isDev = process.env.NODE_ENV === "development";
+    const backendUrl = process.env.BACKEND_URL;
+
+    if (backendUrl) {
+      return [
+        {
+          source: "/api/py/:path*",
+          destination: `${backendUrl}/api/py/:path*`,
+        },
+      ];
+    }
+
+    if (isDev) {
+      return [
+        {
+          source: "/api/py/:path*",
+          destination: "http://127.0.0.1:8000/api/py/:path*",
+        },
+      ];
+    }
+
     return [
       {
         source: "/api/py/:path*",
-        destination: `${backendUrl}/api/:path*`,
+        destination: "/api/",
       },
     ];
   },

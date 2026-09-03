@@ -611,14 +611,24 @@ export default function Home() {
       setTimeout(() => setLoadingText(parsingText), 600);
       
       const response = await fetch(`/api/py/extract?url=${encodeURIComponent(trimmed)}`);
-      const data = await response.json();
+      
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(
+          `Server returned an invalid response (${response.status}). Please check your connection or try again.`
+        );
+      }
 
       clearInterval(progressTimer);
       setProgress(95);
       setLoadingText(fetchingText);
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.detail || "Unable to extract media from this URL. Please ensure the link is public.");
+      if (!response.ok || !data || !data.success) {
+        throw new Error(
+          (data && data.detail) || "Unable to extract media from this URL. Please ensure the link is public."
+        );
       }
 
       setProgress(100);

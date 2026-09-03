@@ -389,12 +389,17 @@ def extract_instagram(url: str) -> Dict[str, Any]:
     )
 
 
+@app.get("/")
 @app.get("/api/health")
+@app.get("/api/py/health")
+@app.get("/health")
 def health_check():
     return {"status": "ok", "service": "LX-Downloader Python Backend"}
 
 
 @app.get("/api/extract")
+@app.get("/api/py/extract")
+@app.get("/extract")
 def extract_media(url: str = Query(..., description="The media URL to extract")):
     if not url or not url.strip():
         raise HTTPException(status_code=400, detail="URL cannot be empty.")
@@ -413,6 +418,8 @@ def extract_media(url: str = Query(..., description="The media URL to extract"))
 
 
 @app.get("/api/download")
+@app.get("/api/py/download")
+@app.get("/download")
 async def download_file(
     url: Optional[str] = Query(None, description="Direct media stream URL or YouTube link"),
     video_id: Optional[str] = Query(None, description="YouTube Video ID"),
