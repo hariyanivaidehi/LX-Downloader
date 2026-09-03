@@ -510,6 +510,7 @@ export default function Home() {
   const [downloadingOption, setDownloadingOption] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [downloadCompleted, setDownloadCompleted] = useState(false);
+  const [hasDownloaded, setHasDownloaded] = useState(false);
   const [downloadStatusText, setDownloadStatusText] = useState("");
   const [showIframePreview, setShowIframePreview] = useState(false);
   
@@ -538,6 +539,7 @@ export default function Home() {
     setInputUrl("");
     setErrorMsg("");
     setResult(null);
+    setHasDownloaded(false);
   };
 
   const handleSubTabClick = (tabId: string) => {
@@ -545,6 +547,7 @@ export default function Home() {
     setInputUrl("");
     setErrorMsg("");
     setResult(null);
+    setHasDownloaded(false);
   };
 
   const formatDuration = (seconds?: number) => {
@@ -638,6 +641,8 @@ export default function Home() {
       setTimeout(() => {
         setLoading(false);
         setShowIframePreview(false);
+        setHasDownloaded(false);
+        setDownloadCompleted(false);
         setResult({
           platform: data.platform || (isYt ? "youtube" : "instagram"),
           video_id: data.video_id || "",
@@ -705,6 +710,7 @@ export default function Home() {
     setDownloadingOption(null);
     setDownloadProgress(null);
     setDownloadCompleted(false);
+    setHasDownloaded(false);
     setDownloadStatusText("");
     if (inputRef.current) {
       inputRef.current.focus();
@@ -787,6 +793,7 @@ export default function Home() {
       setDownloadingOption(null);
       setDownloadProgress(null);
       setDownloadCompleted(true);
+      setHasDownloaded(true);
       setDownloadStatusText("Download Completed! Video saved successfully.");
 
       // Auto-revert completed status after 5s
@@ -809,6 +816,7 @@ export default function Home() {
       setDownloadingOption(null);
       setDownloadProgress(null);
       setDownloadCompleted(true);
+      setHasDownloaded(true);
       setDownloadStatusText("Download Completed! File saved successfully.");
 
       setTimeout(() => {
@@ -1164,37 +1172,37 @@ export default function Home() {
                   {/* Clean Solid Blue Download Now Button & In-Place Realtime Status Indicators */}
                   <div className="w-full max-w-md flex flex-col gap-3">
                     
-                    {/* Dynamic Action Button */}
-                    {downloadCompleted ? (
-                      <div className="w-full py-4 rounded-xl bg-emerald-600 text-white font-black text-sm sm:text-base tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30">
-                        <CheckCircle className="w-5 h-5" />
-                        <span>DOWNLOAD COMPLETED!</span>
-                      </div>
-                    ) : (
-                      <button
-                        disabled={downloading}
-                        onClick={() => triggerDownloadAction(result.download_url, result.title)}
-                        className={`w-full py-4 rounded-xl text-white font-black text-sm sm:text-base tracking-wider transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2 group ${
-                          downloading
-                            ? "bg-blue-500 cursor-not-allowed shadow-blue-500/20"
-                            : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-blue-600/25"
-                        }`}
-                      >
-                        {downloading && !downloadingOption ? (
-                          <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            <span>
-                              {downloadProgress ? `DOWNLOADING ${downloadProgress}%...` : "PREPARING & DOWNLOADING..."}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <Download className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
-                            <span>DOWNLOAD NOW</span>
-                          </>
-                        )}
-                      </button>
-                    )}
+                    {/* Dynamic Action Button - switches to DOWNLOAD AGAIN after finish */}
+                    <button
+                      disabled={downloading}
+                      onClick={() => triggerDownloadAction(result.download_url, result.title)}
+                      className={`w-full py-4 rounded-xl text-white font-black text-sm sm:text-base tracking-wider transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2 group ${
+                        downloading
+                          ? "bg-blue-500 cursor-not-allowed shadow-blue-500/20"
+                          : hasDownloaded
+                          ? "bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-blue-600/25"
+                          : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-blue-600/25"
+                      }`}
+                    >
+                      {downloading && !downloadingOption ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>
+                            {downloadProgress ? `DOWNLOADING ${downloadProgress}%...` : "DOWNLOADING... PLEASE WAIT"}
+                          </span>
+                        </>
+                      ) : hasDownloaded ? (
+                        <>
+                          <RefreshCw className="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" />
+                          <span>DOWNLOAD AGAIN</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-5 h-5 group-hover:translate-y-0.5 transition-transform" />
+                          <span>DOWNLOAD NOW</span>
+                        </>
+                      )}
+                    </button>
 
                     {/* IN-PLACE REALTIME STATUS ALERT: "WAIT / DON'T LEAVE" OR "COMPLETED" */}
                     <AnimatePresence>
@@ -1250,17 +1258,19 @@ export default function Home() {
                             {downloadingOption === opt.id ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             ) : null}
-                            {opt.label}
+                            {hasDownloaded ? `Download Again (${opt.label})` : opt.label}
                           </button>
                         ))}
                       </div>
                     )}
 
+                    {/* Prominent, Clearly Visible Clear Result Button */}
                     <button
                       onClick={handleClearResult}
-                      className="text-xs font-bold text-slate-400 hover:text-slate-600 py-1 transition-colors cursor-pointer"
+                      className="w-full py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 hover:text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border border-slate-200 transition-all cursor-pointer shadow-sm mt-1"
                     >
-                      {d.clearBtn}
+                      <X className="w-4 h-4 text-slate-500" />
+                      <span>{d.clearBtn || "Clear Result"}</span>
                     </button>
                   </div>
                 </motion.div>
