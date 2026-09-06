@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { 
-  Flame, Link2, Play, Download, RefreshCw, Film, Image as ImageIcon, Compass, UserCheck, Search, X, ChevronDown, AlertCircle, CheckCircle, Loader2, User, UserX, Sparkles, Lock, ExternalLink
+  Flame, Link2, Play, Download, RefreshCw, Film, Image as ImageIcon, Compass, UserCheck, Search, X, ChevronDown, AlertCircle, CheckCircle, Loader2, User, UserX, Sparkles, Lock, ExternalLink, Clock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -514,6 +514,8 @@ export default function Home() {
   const [stepsMethod, setStepsMethod] = useState<"link" | "username">("link");
   const [previewStreamUrl, setPreviewStreamUrl] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false);
+  const [modalItem, setModalItem] = useState<any>(null);
+  const [modalStreamUrl, setModalStreamUrl] = useState<string | null>(null);
   
   // Set first FAQ open by default (index 0) matching user screenshot
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -1317,8 +1319,8 @@ export default function Home() {
                       {(() => {
                         const reelsCount = result.items?.filter((i: any) => i.category === "reels").length || (result.has_reels ? "Active" : 0);
                         const postsCount = result.post_count || result.items?.filter((i: any) => i.category === "post").length || 0;
-                        const storiesCount = result.items?.filter((i: any) => i.category === "story").length || (result.has_story ? "1 Active" : 0);
-                        const highlightsCount = result.items?.filter((i: any) => i.category === "highlight").length || (result.highlight_count !== null && result.highlight_count !== undefined ? result.highlight_count : "Album");
+                        const storiesCount = result.items?.filter((i: any) => i.category === "story").length || (result.has_story ? "Active" : 0);
+                        const highlightsCount = result.items?.filter((i: any) => i.category === "highlight").length || (result.highlight_count !== null && result.highlight_count !== undefined ? result.highlight_count : 0);
                         
                         const totalMediaCount = result.is_private 
                           ? (result.post_count || 0)
@@ -1450,129 +1452,68 @@ export default function Home() {
                                   </button>
                                 </div>
                               </div>
-                            ) : profileFilter === "story" ? (
-                              /* View 2: Story View (Active 24h Story or Expired Notice) */
-                              result.has_story || currentFiltered.length > 0 ? (
-                                <div className="py-8 px-5 sm:px-8 rounded-3xl bg-white border border-slate-200/80 shadow-md text-center flex flex-col items-center justify-center gap-4 max-w-xl mx-auto animate-fade-in w-full">
-                                  {/* Instagram Story Gradient Ring Avatar */}
-                                  <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full p-1.5 bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 shadow-lg">
-                                    <img
-                                      src={result.thumbnail || result.avatar}
-                                      alt={`${result.username} Story`}
-                                      className="w-full h-full object-cover rounded-full bg-white p-0.5"
-                                      onError={(e: any) => {
-                                        e.currentTarget.src = result.avatar || "";
-                                      }}
-                                    />
-                                    <span className="absolute bottom-0 right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-white text-[10px] shadow font-black">
-                                      ✓
-                                    </span>
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-black border border-emerald-200 mb-1">
-                                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                                      Active 24-Hour Story Available
-                                    </div>
-                                    <h3 className="text-base sm:text-lg font-black text-slate-900">
-                                      @{result.username}&apos;s Live 24h Story
-                                    </h3>
-                                    <p className="text-xs text-slate-500 leading-relaxed max-w-md">
-                                      @{result.username} has posted an active story within the last 24 hours. You can view or save this story directly.
-                                    </p>
-                                  </div>
-
-                                  <div className="w-full flex flex-col sm:flex-row gap-2.5 max-w-sm">
-                                    <a
-                                      href={`https://www.instagram.com/stories/${result.username}/`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
-                                    >
-                                      <Play className="w-4 h-4 fill-current" />
-                                      <span>Open Story on Instagram</span>
-                                    </a>
-                                  </div>
-
-                                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-left text-[11px] text-slate-600 leading-relaxed w-full space-y-1">
-                                    <p className="font-bold text-slate-800">💡 How to download story video/photo directly in Full HD:</p>
-                                    <ol className="list-decimal pl-4 space-y-0.5">
-                                      <li>Open Instagram and tap @{result.username}&apos;s story.</li>
-                                      <li>Tap the <strong>••• (3 dots)</strong> or <strong>Share</strong> button.</li>
-                                      <li>Tap <strong>Copy Link</strong> and paste the link into the search box above to download!</li>
-                                    </ol>
-                                  </div>
+                            ) : profileFilter === "story" && currentFiltered.length === 0 ? (
+                              /* View 2: Empty Active Stories Notice (No Instagram Redirect) */
+                              <div className="py-10 px-5 sm:px-8 rounded-3xl bg-slate-50 border border-slate-200 text-center flex flex-col items-center justify-center gap-3.5 max-w-xl mx-auto w-full animate-fade-in">
+                                <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shadow-inner">
+                                  <Clock className="w-6 h-6" />
                                 </div>
-                              ) : (
-                                <div className="py-10 px-5 sm:px-8 rounded-3xl bg-slate-50 border border-slate-200 text-center flex flex-col items-center justify-center gap-3.5 max-w-xl mx-auto w-full animate-fade-in">
-                                  <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
-                                    <Compass className="w-6 h-6" />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <h3 className="text-sm sm:text-base font-black text-slate-800">
-                                      No Active 24-Hour Stories for @{result.username}
-                                    </h3>
-                                    <p className="text-xs text-slate-500 leading-relaxed max-w-md">
-                                      Instagram Stories automatically disappear after 24 hours. @{result.username} has not posted a new story in the past 24 hours.
-                                    </p>
-                                  </div>
+                                <div className="space-y-1">
+                                  <h3 className="text-sm sm:text-base font-black text-slate-800">
+                                    No Active 24-Hour Stories for @{result.username}
+                                  </h3>
+                                  <p className="text-xs text-slate-500 leading-relaxed max-w-md">
+                                    Instagram stories disappear automatically after 24 hours. @{result.username} has no active stories at this moment.
+                                  </p>
+                                </div>
+                                <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
                                   <button
                                     type="button"
                                     onClick={() => { setProfileFilter("reels"); setSubTab("reels"); }}
-                                    className="mt-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                                   >
                                     <Film className="w-3.5 h-3.5" />
                                     <span>Browse Available Reels ({reelsCount})</span>
                                   </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setProfileFilter("post"); setSubTab("post"); }}
+                                    className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    <span>Browse Posts ({postsCount})</span>
+                                  </button>
                                 </div>
-                              )
-                            ) : profileFilter === "highlight" ? (
-                              /* View 3: Highlight Downloader Hub */
-                              <div className="py-8 px-5 sm:px-8 rounded-3xl bg-white border border-slate-200/80 shadow-md text-center flex flex-col items-center justify-center gap-4 max-w-xl mx-auto animate-fade-in w-full">
-                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 text-white flex items-center justify-center shadow-md">
-                                  <Sparkles className="w-8 h-8" />
+                              </div>
+                            ) : profileFilter === "highlight" && currentFiltered.length === 0 ? (
+                              /* View 3: Empty Highlights Notice (No Instagram Redirect) */
+                              <div className="py-10 px-5 sm:px-8 rounded-3xl bg-slate-50 border border-slate-200 text-center flex flex-col items-center justify-center gap-3.5 max-w-xl mx-auto w-full animate-fade-in">
+                                <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center shadow-inner">
+                                  <Sparkles className="w-6 h-6" />
                                 </div>
-
                                 <div className="space-y-1">
-                                  <span className="text-[10px] font-black tracking-widest text-amber-600 uppercase bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
-                                    Story Highlights Downloader
-                                  </span>
-                                  <h3 className="text-base sm:text-lg font-black text-slate-900">
-                                    @{result.username}&apos;s Story Highlights
+                                  <h3 className="text-sm sm:text-base font-black text-slate-800">
+                                    No Saved Highlights Found for @{result.username}
                                   </h3>
                                   <p className="text-xs text-slate-500 leading-relaxed max-w-md">
-                                    Story Highlights are permanently saved story albums on @{result.username}&apos;s profile. Download any highlight by copying its link:
+                                    @{result.username} currently does not have any public story highlights pinned on their profile.
                                   </p>
                                 </div>
-
-                                <div className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 text-left text-xs text-slate-600 space-y-2">
-                                  <p className="font-bold text-slate-800">📌 Easy Steps to Download Highlights:</p>
-                                  <div className="space-y-1.5 text-[11px]">
-                                    <div className="flex items-start gap-2">
-                                      <span className="w-4 h-4 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-[10px]">1</span>
-                                      <span>Open @{result.username}&apos;s profile on Instagram.</span>
-                                    </div>
-                                    <div className="flex items-start gap-2">
-                                      <span className="w-4 h-4 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-[10px]">2</span>
-                                      <span>Tap on any Highlight circle (album) you wish to download.</span>
-                                    </div>
-                                    <div className="flex items-start gap-2">
-                                      <span className="w-4 h-4 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-[10px]">3</span>
-                                      <span>Tap <strong>Share &gt; Copy Link</strong> and paste the link into the search box above!</span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-col sm:flex-row gap-2.5 w-full max-w-sm">
-                                  <a
-                                    href={`https://www.instagram.com/${result.username}/`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow transition-all"
+                                <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => { setProfileFilter("reels"); setSubTab("reels"); }}
+                                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                                   >
-                                    <ExternalLink className="w-4 h-4" />
-                                    <span>Open @{result.username} Highlights on Instagram</span>
-                                  </a>
+                                    <Film className="w-3.5 h-3.5" />
+                                    <span>Browse Available Reels ({reelsCount})</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setProfileFilter("post"); setSubTab("post"); }}
+                                    className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    <span>Browse Posts ({postsCount})</span>
+                                  </button>
                                 </div>
                               </div>
                             ) : result.is_private ? (
@@ -1626,63 +1567,88 @@ export default function Home() {
                                 </button>
                               </div>
                             ) : (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-left">
-                                {currentFiltered.map((item: any) => {
-                                  const isItemDownloading = downloading && downloadingOption === item.id;
-                                  return (
-                                    <div
-                                      key={item.id}
-                                      className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
-                                    >
-                                      <div className="relative aspect-square bg-slate-900 overflow-hidden">
-                                        <img
-                                          src={item.thumbnail}
-                                          alt={item.title}
-                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                          onError={(e: any) => {
-                                            e.currentTarget.src = result.avatar || "";
-                                          }}
-                                        />
-                                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/75 text-white text-[10px] font-black uppercase tracking-wider backdrop-blur-xs">
-                                          {item.category}
-                                        </div>
-                                        {item.type === "video" && (
-                                          <div className="absolute top-2 right-2 p-1.5 rounded-full bg-black/65 text-white">
-                                            <Play className="w-3 h-3 fill-current" />
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      <div className="p-3.5 flex flex-col gap-2.5">
-                                        <h4 className="text-xs font-bold text-slate-800 line-clamp-2 leading-snug">
-                                          {item.title}
-                                        </h4>
-
-                                        <button
-                                          disabled={downloading}
-                                          onClick={() => triggerDownloadAction(item.download_url, `${result.username}_${item.category}_${item.id}`, item.id)}
-                                          className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md ${
-                                            isItemDownloading
-                                              ? "bg-blue-400 text-white cursor-not-allowed"
-                                              : "bg-blue-600 hover:bg-blue-700 text-white active:scale-[0.98] shadow-blue-600/20"
-                                          }`}
-                                        >
-                                          {isItemDownloading ? (
-                                            <>
-                                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                              <span>DOWNLOADING...</span>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Download className="w-3.5 h-3.5" />
-                                              <span>DOWNLOAD {item.ext?.toUpperCase() || "MEDIA"}</span>
-                                            </>
-                                          )}
-                                        </button>
-                                      </div>
+                              <div className="flex flex-col gap-3 w-full">
+                                {profileFilter === "story" && (
+                                  <div className="w-full p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                                      <span>{currentFiltered.length} Active 24-Hour {currentFiltered.length === 1 ? "Story" : "Stories"} Available for @{result.username}</span>
                                     </div>
-                                  );
-                                })}
+                                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                                      Click any story to watch preview
+                                    </span>
+                                  </div>
+                                )}
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-left">
+                                  {currentFiltered.map((item: any) => {
+                                    const isItemDownloading = downloading && downloadingOption === item.id;
+                                    return (
+                                      <div
+                                        key={item.id}
+                                        className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
+                                      >
+                                        <div 
+                                          onClick={() => { setModalItem(item); setModalStreamUrl(null); }}
+                                          className="relative aspect-square bg-slate-900 overflow-hidden cursor-pointer"
+                                        >
+                                          <img
+                                            src={item.thumbnail}
+                                            alt={item.title}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            onError={(e: any) => {
+                                              e.currentTarget.src = result.avatar || "";
+                                            }}
+                                          />
+                                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/75 text-white text-[10px] font-black uppercase tracking-wider backdrop-blur-xs">
+                                            {item.category}
+                                          </div>
+                                          {item.type === "video" && (
+                                            <div className="absolute top-2 right-2 p-1.5 rounded-full bg-black/65 text-white group-hover:scale-110 group-hover:bg-blue-600 transition-all">
+                                              <Play className="w-3 h-3 fill-current" />
+                                            </div>
+                                          )}
+                                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                            <span className="px-3 py-1 rounded-full bg-black/75 text-white text-xs font-bold backdrop-blur-xs">
+                                              {item.type === "video" ? "Watch Video" : "View Photo"}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <div className="p-3.5 flex flex-col gap-2.5">
+                                          <h4 className="text-xs font-bold text-slate-800 line-clamp-2 leading-snug">
+                                            {item.title}
+                                          </h4>
+
+                                          <button
+                                            disabled={downloading}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              triggerDownloadAction(item.download_url, `${result.username}_${item.category}_${item.id}`, item.id);
+                                            }}
+                                            className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md ${
+                                              isItemDownloading
+                                                ? "bg-blue-400 text-white cursor-not-allowed"
+                                                : "bg-blue-600 hover:bg-blue-700 text-white active:scale-[0.98] shadow-blue-600/20"
+                                            }`}
+                                          >
+                                            {isItemDownloading ? (
+                                              <>
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                <span>DOWNLOADING...</span>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Download className="w-3.5 h-3.5" />
+                                                <span>DOWNLOAD {item.ext?.toUpperCase() || "MEDIA"}</span>
+                                              </>
+                                            )}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -2081,6 +2047,95 @@ export default function Home() {
           </div>
         </div>
       </motion.section>
+
+      {/* In-App Media Preview Modal (Stories, Reels, Posts) */}
+      <AnimatePresence>
+        {modalItem && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6"
+            onClick={() => setModalItem(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-slate-900 border border-slate-700/80 rounded-3xl overflow-hidden max-w-md w-full shadow-2xl flex flex-col relative text-white"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="p-4 flex items-center justify-between border-b border-slate-800">
+                <div className="flex items-center gap-2 overflow-hidden pr-2">
+                  <span className="px-2 py-0.5 rounded-md bg-blue-600 text-[10px] font-black uppercase tracking-wider shrink-0">
+                    {modalItem.category}
+                  </span>
+                  <h3 className="text-xs sm:text-sm font-bold truncate text-slate-200">
+                    {modalItem.title}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setModalItem(null)}
+                  className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Media Player */}
+              <div className="relative bg-black aspect-square sm:aspect-[9/16] max-h-[60vh] flex items-center justify-center overflow-hidden">
+                {modalItem.type === "video" || modalItem.download_url?.includes(".mp4") ? (
+                  <video
+                    key={modalStreamUrl || modalItem.download_url}
+                    src={modalStreamUrl || modalItem.download_url}
+                    poster={modalItem.thumbnail}
+                    controls
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-contain"
+                    onError={() => {
+                      if (!modalStreamUrl && modalItem.download_url) {
+                        setModalStreamUrl(`/api/py/stream?url=${encodeURIComponent(modalItem.download_url)}`);
+                      }
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={modalItem.download_url || modalItem.thumbnail}
+                    alt={modalItem.title}
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </div>
+
+              {/* Footer / Actions */}
+              <div className="p-4 flex flex-col sm:flex-row gap-2.5 bg-slate-900 border-t border-slate-800">
+                <button
+                  disabled={downloading}
+                  onClick={() => {
+                    triggerDownloadAction(
+                      modalItem.download_url, 
+                      `${result?.username || "instagram"}_${modalItem.category}_${modalItem.id}`, 
+                      modalItem.id
+                    );
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>DOWNLOAD {modalItem.ext?.toUpperCase() || "MEDIA"}</span>
+                </button>
+                <button
+                  onClick={() => setModalItem(null)}
+                  className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs sm:text-sm transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

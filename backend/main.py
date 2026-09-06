@@ -162,8 +162,8 @@ def transcode_video(media_url: str, quality: str = "1080p") -> Optional[str]:
     if os.path.exists(target_path) and os.path.getsize(target_path) > 1024:
         return target_path
 
-    temp_output = target_path + f".tmp.{ext}"
-    headers_opt = "Referer: https://www.instagram.com/\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n"
+    ref = "https://insta-stories-viewer.com/" if ("iqsaved" in media_url or "insta-stories-viewer" in media_url) else ("https://www.instagram.com/" if ("instagram" in media_url or "fbcdn" in media_url) else "https://www.google.com/")
+    headers_opt = f"Referer: {ref}\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n"
 
     if quality == "audio":
         cmd = [
@@ -354,6 +354,113 @@ def pk_to_shortcode(pk: int) -> str:
     return shortcode
 
 
+ISV_TOKEN_CACHE: Dict[str, Any] = {"token": None, "timestamp": 0}
+
+
+def get_isv_token() -> Optional[str]:
+    """Retrieve or refresh session token for the anonymous stories Engine.IO socket."""
+    now = time.time()
+    if ISV_TOKEN_CACHE.get("token") and (now - ISV_TOKEN_CACHE.get("timestamp", 0)) < 900:
+        return ISV_TOKEN_CACHE["token"]
+
+    try:
+        r = requests.get(
+            "https://insta-stories-viewer.com/connect/",
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+                "Referer": "https://insta-stories-viewer.com/",
+                "Origin": "https://insta-stories-viewer.com",
+            },
+            timeout=8,
+        )
+        if r.status_code == 200:
+            tok = r.json().get("token")
+            if tok:
+                ISV_TOKEN_CACHE["token"] = tok
+                ISV_TOKEN_CACHE["timestamp"] = now
+                return tok
+    except Exception:
+        pass
+    return ISV_TOKEN_CACHE.get("token")
+
+
+def fetch_instagram_stories_isv(username: str) -> List[Dict[str, Any]]:
+    """Fetch real Instagram active 24-hour stories using Engine.IO / Socket.IO v4 long-polling."""
+    clean_user = username.strip().lstrip("@").lower()
+    token = get_isv_token()
+    if not token:
+        return []
+
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Referer": f"https://insta-stories-viewer.com/{clean_user}/",
+        "Origin": "https://insta-stories-viewer.com",
+        "Accept": "*/*",
+    })
+
+    try:
+        r_hs = session.get("https://insta-stories-viewer.com/socket.io/?EIO=4&transport=polling", timeout=8)
+        if r_hs.status_code != 200 or not r_hs.text.startswith("0"):
+            return []
+        sid = json.loads(r_hs.text[1:]).get("sid")
+        if not sid:
+            return []
+
+        # Connect packet 40 and read server ack
+        session.post(f"https://insta-stories-viewer.com/socket.io/?EIO=4&transport=polling&sid={sid}", data="40", timeout=6)
+        session.get(f"https://insta-stories-viewer.com/socket.io/?EIO=4&transport=polling&sid={sid}", timeout=6)
+
+        # Emit search packet
+        payload = {
+            "username": clean_user,
+            "date": int(time.time() * 1000),
+            "token": token,
+            "serverType": "stories",
+        }
+        packet = f'42{json.dumps(["search", payload])}'
+        session.post(f"https://insta-stories-viewer.com/socket.io/?EIO=4&transport=polling&sid={sid}", data=packet, timeout=6)
+
+        story_items = []
+        for _ in range(6):
+            r_poll = session.get(f"https://insta-stories-viewer.com/socket.io/?EIO=4&transport=polling&sid={sid}", timeout=10)
+            text = r_poll.text
+            if "searchResult" in text:
+                data = json.loads(text[2:])[1].get("data", {})
+                user_obj = data.get("user", {})
+                reels = user_obj.get("reels", [])
+                if isinstance(reels, list):
+                    for idx, reel in enumerate(reels):
+                        is_vid = reel.get("is_video", True)
+                        vid_enc = reel.get("video_url", "")
+                        img_enc = reel.get("display_url") or reel.get("thumbnail_src", "")
+
+                        vid_url = f"https://cdn.iqsaved.com/img2.php?url={urllib.parse.quote(vid_enc)}" if vid_enc else ""
+                        img_url = f"https://cdn.iqsaved.com/img2.php?url={urllib.parse.quote(img_enc)}" if img_enc else ""
+                        dl_url = vid_url if is_vid else img_url
+                        if not dl_url:
+                            continue
+
+                        story_items.append({
+                            "id": f"story_{clean_user}_{reel.get('id', idx)}",
+                            "category": "story",
+                            "type": "video" if is_vid else "image",
+                            "title": f"@{clean_user} Active Story {idx + 1} ({'Video' if is_vid else 'Photo'})",
+                            "thumbnail": img_url or dl_url,
+                            "download_url": dl_url,
+                            "ext": "mp4" if is_vid else "jpg",
+                            "is_video": is_vid,
+                        })
+                break
+            elif text == "2":
+                session.post(f"https://insta-stories-viewer.com/socket.io/?EIO=4&transport=polling&sid={sid}", data="3", timeout=4)
+            time.sleep(0.4)
+
+        return story_items
+    except Exception:
+        return []
+
+
 def extract_instagram_user(username: str) -> Dict[str, Any]:
     """Extract an Instagram user profile with Reels, Posts, Stories, Highlights, and DP."""
     clean_user = username.strip().lstrip("@").lower()
@@ -470,18 +577,26 @@ def extract_instagram_user(username: str) -> Dict[str, Any]:
             "ext": "jpg",
         })
 
-    # Active 24h Story item if user has an active story
-    if latest_reel_media and str(latest_reel_media) != "0":
-        items.append({
-            "id": f"story_{clean_user}",
-            "category": "story",
-            "type": "video",
-            "title": f"@{clean_user} Active 24-Hour Story",
-            "thumbnail": hd_avatar_url or avatar_url,
-            "download_url": f"https://www.instagram.com/stories/{clean_user}/",
-            "ext": "mp4",
-            "timestamp": latest_reel_media,
-        })
+    # Active 24h Story items (Real playable CDN videos/photos)
+    if not is_private:
+        try:
+            real_stories = fetch_instagram_stories_isv(clean_user)
+            if real_stories:
+                items.extend(real_stories)
+            elif latest_reel_media and str(latest_reel_media) != "0":
+                # Fallback story card if crawler detects story but proxy fails
+                items.append({
+                    "id": f"story_{clean_user}",
+                    "category": "story",
+                    "type": "video" if has_any_clips else "image",
+                    "title": f"@{clean_user} Active 24-Hour Story",
+                    "thumbnail": hd_avatar_url or avatar_url,
+                    "download_url": hd_avatar_url or avatar_url,
+                    "ext": "mp4" if has_any_clips else "jpg",
+                    "timestamp": latest_reel_media,
+                })
+        except Exception:
+            pass
 
     # 2. Extract Timeline Media (Reels & Posts) for public accounts
     if not is_private:
@@ -564,7 +679,7 @@ def extract_instagram_user(username: str) -> Dict[str, Any]:
         "follower_count": follower_count,
         "following_count": following_count,
         "post_count": post_count,
-        "has_story": bool(latest_reel_media and str(latest_reel_media) != "0"),
+        "has_story": bool((latest_reel_media and str(latest_reel_media) != "0") or any(i.get("category") == "story" for i in items)),
         "has_reels": bool(has_any_clips),
         "highlight_count": highlight_count,
         "title": f"@{clean_user}'s Instagram Profile",
@@ -588,6 +703,15 @@ def extract_instagram(url: str) -> Dict[str, Any]:
         username = profile_match.group(1)
         try:
             return extract_instagram_user(username)
+        except Exception:
+            pass
+
+    # Check if this is an Instagram story URL (e.g. instagram.com/stories/username/...)
+    story_match = re.search(r"instagram\.com/stories/([a-zA-Z0-9._]+)", clean_url)
+    if story_match and story_match.group(1).lower() != "highlights":
+        story_user = story_match.group(1)
+        try:
+            return extract_instagram_user(story_user)
         except Exception:
             pass
 
@@ -771,9 +895,10 @@ async def stream_media(url: str = Query(..., description="Direct media stream UR
         raise HTTPException(status_code=400, detail="Missing stream URL.")
     
     ext = "mp4" if (".mp4" in raw_url or "video" in raw_url) else "jpg"
+    ref = "https://insta-stories-viewer.com/" if ("iqsaved" in raw_url or "insta-stories-viewer" in raw_url) else ("https://www.instagram.com/" if ("instagram" in raw_url or "fbcdn" in raw_url) else "https://www.google.com/")
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": "https://www.instagram.com/" if ("instagram" in raw_url or "fbcdn" in raw_url) else "https://www.google.com/",
+        "Referer": ref,
     }
 
     client = httpx.AsyncClient(follow_redirects=True, timeout=httpx.Timeout(None, connect=30.0))
@@ -893,9 +1018,10 @@ async def download_file(
     ext = "mp4" if ".mp4" in raw_url or filename.endswith(".mp4") else "jpg"
     safe_name = sanitize_filename(filename.rsplit(".", 1)[0], ext=ext)
 
+    ref = "https://insta-stories-viewer.com/" if ("iqsaved" in raw_url or "insta-stories-viewer" in raw_url) else ("https://www.instagram.com/" if ("instagram" in raw_url or "fbcdn" in raw_url) else "https://www.google.com/")
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://www.instagram.com/" if "instagram" in raw_url or "fbcdn" in raw_url else "https://www.google.com/",
+        "Referer": ref,
     }
 
     client = httpx.AsyncClient(follow_redirects=True, timeout=httpx.Timeout(None, connect=30.0))
