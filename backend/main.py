@@ -260,8 +260,7 @@ def extract_instagram_user(username: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"Instagram profile returned status {resp.status_code}.")
 
     raw_html = resp.text
-    if "this account is private" in raw_html.lower():
-        raise HTTPException(status_code=400, detail=f"@{clean_user} is a private account. Media can only be downloaded from public accounts.")
+    is_private = "this account is private" in raw_html.lower() or '"is_private":true' in raw_html.replace(" ", "")
     if "sorry, this page isn't available" in raw_html.lower():
         raise HTTPException(status_code=404, detail=f"Instagram profile @{clean_user} is not available.")
 
@@ -278,107 +277,166 @@ def extract_instagram_user(username: str) -> Dict[str, Any]:
     full_name_match = re.match(r"^(.*?)\s*\(@", title_str)
     full_name = full_name_match.group(1).strip() if full_name_match else clean_user
 
-    # Parse followers / posts count from desc_str
+    # Parse followers / following / posts count from desc_str
     followers_match = re.search(r"([0-9.,MKkmb]+)\s+Followers", desc_str, re.IGNORECASE)
     follower_count = followers_match.group(1) if followers_match else ""
+
+    following_match = re.search(r"([0-9.,MKkmb]+)\s+Following", desc_str, re.IGNORECASE)
+    following_count = following_match.group(1) if following_match else ""
 
     posts_match = re.search(r"([0-9.,MKkmb]+)\s+Posts", desc_str, re.IGNORECASE)
     post_count = posts_match.group(1) if posts_match else ""
 
+    user_bio = ""
+    latest_reel_media = None
+    has_any_clips = False
+    highlight_count = None
+    is_verified = False
+
+    # Extract deep user attributes from SSR script
+    scripts = re.findall(r'<script type="application/json"[^>]*>(.*?)</script>', raw_html, re.DOTALL)
+    for s in scripts:
+        if "xig_user_by_igid_v2" in s:
+            try:
+                d = json.loads(s)
+                def find_u(obj):
+                    if isinstance(obj, dict):
+                        if "xig_user_by_igid_v2" in obj:
+                            return obj["xig_user_by_igid_v2"]
+                        for v in obj.values():
+                            res = find_u(v)
+                            if res: return res
+                    elif isinstance(obj, list):
+                        for v in obj:
+                            res = find_u(v)
+                            if res: return res
+                    return None
+                u = find_u(d)
+                if u:
+                    if u.get("is_private") is not None:
+                        is_private = bool(u.get("is_private"))
+                    if u.get("full_name"):
+                        full_name = u.get("full_name")
+                    if u.get("biography"):
+                        user_bio = u.get("biography")
+                    if u.get("is_verified"):
+                        is_verified = bool(u.get("is_verified"))
+                    if u.get("follower_count") and not follower_count:
+                        follower_count = str(u.get("follower_count"))
+                    if u.get("following_count") and not following_count:
+                        following_count = str(u.get("following_count"))
+                    if u.get("latest_reel_media"):
+                        latest_reel_media = u.get("latest_reel_media")
+                    if u.get("has_any_clips"):
+                        has_any_clips = bool(u.get("has_any_clips"))
+                    if u.get("highlight_reel_count") is not None:
+                        highlight_count = u.get("highlight_reel_count")
+                    if u.get("profile_pic_url") and not hd_avatar_url:
+                        hd_avatar_url = u.get("profile_pic_url")
+            except Exception:
+                pass
+
     items = []
 
-    # 1. Profile Picture item
-    if hd_avatar_url:
+    # 1. Profile Picture item (Always accessible and downloadable for all accounts)
+    if hd_avatar_url or avatar_url:
+        dl_avatar = hd_avatar_url or avatar_url
         items.append({
             "id": f"dp_{clean_user}",
             "category": "dp",
             "type": "image",
             "title": f"@{clean_user} HD Profile Picture",
-            "thumbnail": hd_avatar_url,
-            "download_url": hd_avatar_url,
+            "thumbnail": dl_avatar,
+            "download_url": dl_avatar,
             "ext": "jpg",
         })
 
-    # 2. Extract Timeline Media (Reels & Posts) from polaris_timeline_connection
-    scripts = re.findall(r'<script type="application/json"[^>]*>(.*?)</script>', raw_html, re.DOTALL)
-    for s in scripts:
-        if "polaris_timeline_connection" in s:
-            try:
-                d = json.loads(s)
-                def find_edges(obj):
-                    if isinstance(obj, dict):
-                        if "polaris_timeline_connection" in obj:
-                            return obj["polaris_timeline_connection"].get("edges", [])
-                        for v in obj.values():
-                            res = find_edges(v)
-                            if res: return res
-                    elif isinstance(obj, list):
-                        for v in obj:
-                            res = find_edges(v)
-                            if res: return res
-                    return None
+    # 2. Extract Timeline Media (Reels & Posts) for public accounts
+    if not is_private:
+        for s in scripts:
+            if "polaris_timeline_connection" in s:
+                try:
+                    d = json.loads(s)
+                    def find_edges(obj):
+                        if isinstance(obj, dict):
+                            if "polaris_timeline_connection" in obj:
+                                return obj["polaris_timeline_connection"].get("edges", [])
+                            for v in obj.values():
+                                res = find_edges(v)
+                                if res: return res
+                        elif isinstance(obj, list):
+                            for v in obj:
+                                res = find_edges(v)
+                                if res: return res
+                        return None
 
-                edges = find_edges(d)
-                if edges:
-                    for edge in edges:
-                        node = edge.get("node", {})
-                        pk_str = str(node.get("pk") or "")
-                        if not pk_str: continue
+                    edges = find_edges(d)
+                    if edges:
+                        for edge in edges:
+                            node = edge.get("node", {})
+                            pk_str = str(node.get("pk") or "")
+                            if not pk_str: continue
 
-                        try:
-                            shortcode = pk_to_shortcode(int(pk_str))
-                        except Exception:
-                            shortcode = node.get("code") or pk_str
+                            try:
+                                shortcode = pk_to_shortcode(int(pk_str))
+                            except Exception:
+                                shortcode = node.get("code") or pk_str
 
-                        typename = node.get("__typename", "")
-                        product_type = node.get("product_type", "")
-                        is_video = "Video" in typename or product_type == "clips" or node.get("media_type") == 2
-                        category = "reels" if (product_type == "clips" or is_video) else "post"
+                            typename = node.get("__typename", "")
+                            product_type = node.get("product_type", "")
+                            is_video = "Video" in typename or product_type == "clips" or node.get("media_type") == 2
+                            category = "reels" if (product_type == "clips" or is_video) else "post"
 
-                        caption_text = ""
-                        try:
-                            caption_text = node.get("caption", {}).get("text", "")
-                        except Exception:
-                            pass
+                            caption_text = ""
+                            try:
+                                caption_text = node.get("caption", {}).get("text", "")
+                            except Exception:
+                                pass
 
-                        candidates = node.get("image_versions2", {}).get("candidates", [])
-                        thumb = candidates[0].get("url") if candidates else node.get("display_uri")
+                            candidates = node.get("image_versions2", {}).get("candidates", [])
+                            thumb = candidates[0].get("url") if candidates else node.get("display_uri")
 
-                        video_versions = node.get("video_versions", [])
-                        direct_url = video_versions[0].get("url") if (video_versions and is_video) else (thumb or "")
+                            video_versions = node.get("video_versions", [])
+                            direct_url = video_versions[0].get("url") if (video_versions and is_video) else (thumb or "")
 
-                        download_link = direct_url or (f"https://www.instagram.com/reel/{shortcode}/" if is_video else (thumb or f"https://www.instagram.com/p/{shortcode}/"))
+                            download_link = direct_url or (f"https://www.instagram.com/reel/{shortcode}/" if is_video else (thumb or f"https://www.instagram.com/p/{shortcode}/"))
 
-                        clean_caption = caption_text.split("\n")[0][:70].strip() if caption_text else ""
-                        item_title = clean_caption or f"@{clean_user} {category.capitalize()} ({shortcode})"
+                            clean_caption = caption_text.split("\n")[0][:70].strip() if caption_text else ""
+                            item_title = clean_caption or f"@{clean_user} {category.capitalize()} ({shortcode})"
 
-                        items.append({
-                            "id": f"media_{shortcode}",
-                            "pk": pk_str,
-                            "shortcode": shortcode,
-                            "category": category,
-                            "type": "video" if is_video else "image",
-                            "title": item_title,
-                            "thumbnail": thumb,
-                            "download_url": download_link,
-                            "ext": "mp4" if is_video else "jpg",
-                        })
-            except Exception:
-                pass
+                            items.append({
+                                "id": f"media_{shortcode}",
+                                "pk": pk_str,
+                                "shortcode": shortcode,
+                                "category": category,
+                                "type": "video" if is_video else "image",
+                                "title": item_title,
+                                "thumbnail": thumb,
+                                "download_url": download_link,
+                                "ext": "mp4" if is_video else "jpg",
+                            })
+                except Exception:
+                    pass
 
     return {
         "success": True,
         "platform": "instagram",
         "type": "profile",
+        "is_private": is_private,
+        "is_verified": is_verified,
         "username": clean_user,
         "full_name": full_name,
         "avatar": avatar_url or hd_avatar_url,
         "thumbnail": hd_avatar_url or avatar_url,
-        "bio": desc_str,
+        "bio": user_bio or desc_str,
         "follower_count": follower_count,
+        "following_count": following_count,
         "post_count": post_count,
+        "has_story": bool(latest_reel_media and str(latest_reel_media) != "0"),
+        "has_reels": bool(has_any_clips),
+        "highlight_count": highlight_count,
         "title": f"@{clean_user}'s Instagram Profile",
-        "download_url": hd_avatar_url,
+        "download_url": hd_avatar_url or avatar_url,
         "items": items,
     }
 

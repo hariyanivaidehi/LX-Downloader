@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { 
-  Flame, Link2, Play, Download, RefreshCw, Film, Image as ImageIcon, Compass, UserCheck, Search, X, ChevronDown, AlertCircle, CheckCircle, Loader2, User, Sparkles
+  Flame, Link2, Play, Download, RefreshCw, Film, Image as ImageIcon, Compass, UserCheck, Search, X, ChevronDown, AlertCircle, CheckCircle, Loader2, User, Sparkles, Lock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -1127,19 +1127,36 @@ export default function Home() {
                             />
                           </div>
                           <div className="flex flex-col">
-                            <div className="flex items-center justify-center sm:justify-start gap-1.5">
+                            <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                               <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
                                 @{result.username}
                               </h2>
-                              <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                              {result.is_verified && (
+                                <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                              )}
+                              {result.is_private && (
+                                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-xs font-black flex items-center gap-1 border border-amber-300/60 shadow-xs">
+                                  <Lock className="w-3 h-3 text-amber-700" />
+                                  <span>Private Account</span>
+                                </span>
+                              )}
                             </div>
                             {result.full_name && (
-                              <p className="text-sm font-semibold text-slate-700">{result.full_name}</p>
+                              <p className="text-sm font-semibold text-slate-700 mt-0.5">{result.full_name}</p>
                             )}
-                            <div className="flex items-center justify-center sm:justify-start gap-3 mt-1.5 text-xs text-slate-500 font-bold">
-                              {result.follower_count && <span>{result.follower_count} Followers</span>}
-                              {result.follower_count && result.post_count && <span>•</span>}
-                              {result.post_count && <span>{result.post_count} Posts</span>}
+                            {result.bio && (
+                              <p className="text-xs text-slate-600 mt-1 max-w-md line-clamp-2 leading-relaxed">{result.bio}</p>
+                            )}
+                            <div className="flex items-center justify-center sm:justify-start gap-2.5 mt-2 text-xs text-slate-500 font-bold flex-wrap">
+                              {result.follower_count && (
+                                <span className="bg-slate-100 px-2 py-0.5 rounded-md text-slate-700">{result.follower_count} Followers</span>
+                              )}
+                              {result.following_count && (
+                                <span className="bg-slate-100 px-2 py-0.5 rounded-md text-slate-700">{result.following_count} Following</span>
+                              )}
+                              {result.post_count && (
+                                <span className="bg-slate-100 px-2 py-0.5 rounded-md text-slate-700">{result.post_count} Posts</span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1194,14 +1211,17 @@ export default function Home() {
 
                       {/* Interactive Category Tabs: Story, Reels, Post, Highlight */}
                       {(() => {
-                        const reelsCount = result.items?.filter((i: any) => i.category === "reels").length || 0;
-                        const postsCount = result.items?.filter((i: any) => i.category === "post").length || 0;
-                        const storiesCount = result.items?.filter((i: any) => i.category === "story").length || 0;
-                        const highlightsCount = result.items?.filter((i: any) => i.category === "highlight").length || 0;
-                        const totalCount = reelsCount + postsCount + storiesCount + highlightsCount;
+                        const reelsCount = result.items?.filter((i: any) => i.category === "reels").length || (result.has_reels ? "Active" : 0);
+                        const postsCount = result.post_count || result.items?.filter((i: any) => i.category === "post").length || 0;
+                        const storiesCount = result.items?.filter((i: any) => i.category === "story").length || (result.has_story ? 1 : 0);
+                        const highlightsCount = result.items?.filter((i: any) => i.category === "highlight").length || (result.highlight_count !== null && result.highlight_count !== undefined ? result.highlight_count : 0);
+                        
+                        const totalMediaCount = result.is_private 
+                          ? (result.post_count || 0)
+                          : (result.items?.filter((i: any) => i.category !== "dp").length || result.post_count || 0);
 
                         const filterTabs = [
-                          { id: "all", label: "All Media", count: totalCount },
+                          { id: "all", label: "All Media", count: totalMediaCount },
                           { id: "reels", label: "Reels", count: reelsCount },
                           { id: "post", label: "Posts", count: postsCount },
                           { id: "story", label: "Stories", count: storiesCount },
@@ -1236,8 +1256,33 @@ export default function Home() {
                               ))}
                             </div>
 
-                            {/* Items Grid */}
-                            {currentFiltered.length === 0 ? (
+                            {/* Items View: Private Account vs Public Media Grid */}
+                            {result.is_private ? (
+                              <div className="py-10 px-6 rounded-3xl bg-slate-50 border border-slate-200 text-center flex flex-col items-center justify-center gap-3.5">
+                                <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shadow-inner">
+                                  <Lock className="w-7 h-7" />
+                                </div>
+                                <div className="max-w-md space-y-1.5">
+                                  <h3 className="text-base sm:text-lg font-black text-slate-800">
+                                    This Account is Private
+                                  </h3>
+                                  <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                                    @{result.username} has set their profile to private. Follow them on Instagram to see their {profileFilter === "highlight" ? "highlights" : profileFilter === "story" ? "stories" : profileFilter === "reels" ? "reels" : "photos and videos"}.
+                                  </p>
+                                  <p className="text-[11px] font-bold text-amber-800 bg-amber-100/70 py-1.5 px-3 rounded-lg inline-block mt-2 border border-amber-200">
+                                    🔒 Note: Media downloads are only supported for public accounts. Public HD DP is available above.
+                                  </p>
+                                </div>
+                                <button
+                                  disabled={downloading}
+                                  onClick={() => triggerDownloadAction(result.thumbnail || result.download_url, `${result.username}_HD_DP`, "dp")}
+                                  className="mt-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/20 flex items-center gap-2 cursor-pointer"
+                                >
+                                  <Download className="w-4 h-4" />
+                                  <span>Download Public HD DP</span>
+                                </button>
+                              </div>
+                            ) : currentFiltered.length === 0 ? (
                               <div className="py-12 px-4 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center flex flex-col items-center justify-center gap-2">
                                 <p className="text-sm font-bold text-slate-600">
                                   No public {profileFilter === "story" ? "stories" : profileFilter === "highlight" ? "highlights" : profileFilter} available for @{result.username}
