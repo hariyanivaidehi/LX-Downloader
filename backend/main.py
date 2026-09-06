@@ -470,6 +470,19 @@ def extract_instagram_user(username: str) -> Dict[str, Any]:
             "ext": "jpg",
         })
 
+    # Active 24h Story item if user has an active story
+    if latest_reel_media and str(latest_reel_media) != "0":
+        items.append({
+            "id": f"story_{clean_user}",
+            "category": "story",
+            "type": "video",
+            "title": f"@{clean_user} Active 24-Hour Story",
+            "thumbnail": hd_avatar_url or avatar_url,
+            "download_url": f"https://www.instagram.com/stories/{clean_user}/",
+            "ext": "mp4",
+            "timestamp": latest_reel_media,
+        })
+
     # 2. Extract Timeline Media (Reels & Posts) for public accounts
     if not is_private:
         for s in scripts:

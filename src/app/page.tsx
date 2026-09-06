@@ -510,7 +510,7 @@ export default function Home() {
   const [hasDownloaded, setHasDownloaded] = useState(false);
   const [downloadStatusText, setDownloadStatusText] = useState("");
   const [showIframePreview, setShowIframePreview] = useState(false);
-  const [profileFilter, setProfileFilter] = useState<"all" | "reels" | "post" | "story" | "highlight">("all");
+  const [profileFilter, setProfileFilter] = useState<"all" | "reels" | "post" | "story" | "highlight" | "dp">("all");
   const [stepsMethod, setStepsMethod] = useState<"link" | "username">("link");
   const [previewStreamUrl, setPreviewStreamUrl] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false);
@@ -556,7 +556,7 @@ export default function Home() {
     setErrorMsg("");
     setHasDownloaded(false);
     if (result && result.type === "profile") {
-      if (nextTab === "post" || nextTab === "reels" || nextTab === "story" || nextTab === "highlight") {
+      if (nextTab === "post" || nextTab === "reels" || nextTab === "story" || nextTab === "highlight" || nextTab === "dp") {
         setProfileFilter(nextTab as any);
       } else {
         setProfileFilter("all");
@@ -665,8 +665,8 @@ export default function Home() {
         setHasDownloaded(false);
         setDownloadCompleted(false);
         
-        // Automatically sync profile filter to active subTab (e.g. Post -> only posts, Reels -> only reels)
-        if (subTab === "post" || subTab === "reels" || subTab === "story" || subTab === "highlight") {
+        // Automatically sync profile filter to active subTab (e.g. Post -> only posts, Reels -> only reels, DP -> only DP)
+        if (subTab === "post" || subTab === "reels" || subTab === "story" || subTab === "highlight" || subTab === "dp") {
           setProfileFilter(subTab as any);
         } else {
           setProfileFilter("all");
@@ -1317,8 +1317,8 @@ export default function Home() {
                       {(() => {
                         const reelsCount = result.items?.filter((i: any) => i.category === "reels").length || (result.has_reels ? "Active" : 0);
                         const postsCount = result.post_count || result.items?.filter((i: any) => i.category === "post").length || 0;
-                        const storiesCount = result.items?.filter((i: any) => i.category === "story").length || (result.has_story ? 1 : 0);
-                        const highlightsCount = result.items?.filter((i: any) => i.category === "highlight").length || (result.highlight_count !== null && result.highlight_count !== undefined ? result.highlight_count : 0);
+                        const storiesCount = result.items?.filter((i: any) => i.category === "story").length || (result.has_story ? "1 Active" : 0);
+                        const highlightsCount = result.items?.filter((i: any) => i.category === "highlight").length || (result.highlight_count !== null && result.highlight_count !== undefined ? result.highlight_count : "Album");
                         
                         const totalMediaCount = result.is_private 
                           ? (result.post_count || 0)
@@ -1326,6 +1326,7 @@ export default function Home() {
 
                         const filterTabs = [
                           { id: "all", label: "All Media", count: totalMediaCount },
+                          { id: "dp", label: "DP", count: 1 },
                           { id: "reels", label: "Reels", count: reelsCount },
                           { id: "post", label: "Posts", count: postsCount },
                           { id: "story", label: "Stories", count: storiesCount },
@@ -1345,10 +1346,10 @@ export default function Home() {
                                   key={tab.id}
                                   onClick={() => {
                                     setProfileFilter(tab.id as any);
-                                    if (tab.id === "post" || tab.id === "reels" || tab.id === "story" || tab.id === "highlight") {
-                                      setSubTab(tab.id);
-                                    } else {
+                                    if (tab.id === "all") {
                                       setSubTab(null);
+                                    } else {
+                                      setSubTab(tab.id);
                                     }
                                   }}
                                   className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -1367,8 +1368,215 @@ export default function Home() {
                               ))}
                             </div>
 
-                            {/* Items View: Private Account vs Public Media Grid */}
-                            {result.is_private ? (
+                            {/* View 1: DP ONLY VIEW */}
+                            {profileFilter === "dp" ? (
+                              <div className="py-8 px-4 sm:px-8 rounded-3xl bg-white border border-slate-200/80 shadow-md text-center flex flex-col items-center justify-center gap-5 max-w-xl mx-auto animate-fade-in w-full">
+                                <div className="relative group">
+                                  <div className="w-48 h-48 sm:w-60 sm:h-60 rounded-3xl overflow-hidden p-1.5 bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 shadow-xl">
+                                    <img
+                                      src={result.thumbnail || result.avatar || result.download_url}
+                                      alt={`${result.username} HD DP`}
+                                      className="w-full h-full object-cover rounded-2xl bg-slate-900 group-hover:scale-105 transition-transform duration-300"
+                                      onError={(e: any) => {
+                                        e.currentTarget.src = result.avatar || "";
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="absolute bottom-3 right-3 px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md text-white font-black text-[10px] tracking-wider uppercase shadow-md">
+                                    1080p HD
+                                  </span>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <h3 className="text-lg sm:text-xl font-black text-slate-900">
+                                      @{result.username}
+                                    </h3>
+                                    {result.is_verified && (
+                                      <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                                    )}
+                                  </div>
+                                  {result.full_name && (
+                                    <p className="text-xs sm:text-sm font-semibold text-slate-600">{result.full_name}</p>
+                                  )}
+                                  <p className="text-[11px] font-bold text-blue-600 bg-blue-50 py-1 px-3 rounded-full inline-block mt-1 border border-blue-200">
+                                    ✨ Original Full-Size High Definition Profile Picture
+                                  </p>
+                                </div>
+
+                                {/* Direct Action Buttons for DP */}
+                                <div className="w-full flex flex-col sm:flex-row gap-3 items-center justify-center max-w-md">
+                                  <button
+                                    disabled={downloading}
+                                    onClick={() => triggerDownloadAction(result.thumbnail || result.download_url, `${result.username}_FullHD_DP`, "dp")}
+                                    className="w-full sm:flex-1 py-3 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-black text-xs sm:text-sm transition-all shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 cursor-pointer"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                    <span>DOWNLOAD FULL HD DP</span>
+                                  </button>
+                                  <a
+                                    href={result.thumbnail || result.download_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 border border-slate-200 transition-all"
+                                  >
+                                    <ExternalLink className="w-4 h-4" />
+                                    <span>View Full Size</span>
+                                  </a>
+                                </div>
+
+                                {/* Quick switch links */}
+                                <div className="pt-3 border-t border-slate-100 w-full flex items-center justify-center gap-2 text-xs text-slate-500 flex-wrap">
+                                  <span>Also browse @{result.username}&apos;s:</span>
+                                  <button
+                                    onClick={() => { setProfileFilter("reels"); setSubTab("reels"); }}
+                                    className="font-bold text-blue-600 hover:underline"
+                                  >
+                                    Reels ({reelsCount})
+                                  </button>
+                                  <span>•</span>
+                                  <button
+                                    onClick={() => { setProfileFilter("post"); setSubTab("post"); }}
+                                    className="font-bold text-blue-600 hover:underline"
+                                  >
+                                    Posts ({postsCount})
+                                  </button>
+                                  <span>•</span>
+                                  <button
+                                    onClick={() => { setProfileFilter("all"); setSubTab(null); }}
+                                    className="font-bold text-blue-600 hover:underline"
+                                  >
+                                    All Media ({totalMediaCount})
+                                  </button>
+                                </div>
+                              </div>
+                            ) : profileFilter === "story" ? (
+                              /* View 2: Story View (Active 24h Story or Expired Notice) */
+                              result.has_story || currentFiltered.length > 0 ? (
+                                <div className="py-8 px-5 sm:px-8 rounded-3xl bg-white border border-slate-200/80 shadow-md text-center flex flex-col items-center justify-center gap-4 max-w-xl mx-auto animate-fade-in w-full">
+                                  {/* Instagram Story Gradient Ring Avatar */}
+                                  <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full p-1.5 bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 shadow-lg">
+                                    <img
+                                      src={result.thumbnail || result.avatar}
+                                      alt={`${result.username} Story`}
+                                      className="w-full h-full object-cover rounded-full bg-white p-0.5"
+                                      onError={(e: any) => {
+                                        e.currentTarget.src = result.avatar || "";
+                                      }}
+                                    />
+                                    <span className="absolute bottom-0 right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-white text-[10px] shadow font-black">
+                                      ✓
+                                    </span>
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-black border border-emerald-200 mb-1">
+                                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                                      Active 24-Hour Story Available
+                                    </div>
+                                    <h3 className="text-base sm:text-lg font-black text-slate-900">
+                                      @{result.username}&apos;s Live 24h Story
+                                    </h3>
+                                    <p className="text-xs text-slate-500 leading-relaxed max-w-md">
+                                      @{result.username} has posted an active story within the last 24 hours. You can view or save this story directly.
+                                    </p>
+                                  </div>
+
+                                  <div className="w-full flex flex-col sm:flex-row gap-2.5 max-w-sm">
+                                    <a
+                                      href={`https://www.instagram.com/stories/${result.username}/`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                                    >
+                                      <Play className="w-4 h-4 fill-current" />
+                                      <span>Open Story on Instagram</span>
+                                    </a>
+                                  </div>
+
+                                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-left text-[11px] text-slate-600 leading-relaxed w-full space-y-1">
+                                    <p className="font-bold text-slate-800">💡 How to download story video/photo directly in Full HD:</p>
+                                    <ol className="list-decimal pl-4 space-y-0.5">
+                                      <li>Open Instagram and tap @{result.username}&apos;s story.</li>
+                                      <li>Tap the <strong>••• (3 dots)</strong> or <strong>Share</strong> button.</li>
+                                      <li>Tap <strong>Copy Link</strong> and paste the link into the search box above to download!</li>
+                                    </ol>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="py-10 px-5 sm:px-8 rounded-3xl bg-slate-50 border border-slate-200 text-center flex flex-col items-center justify-center gap-3.5 max-w-xl mx-auto w-full animate-fade-in">
+                                  <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
+                                    <Compass className="w-6 h-6" />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <h3 className="text-sm sm:text-base font-black text-slate-800">
+                                      No Active 24-Hour Stories for @{result.username}
+                                    </h3>
+                                    <p className="text-xs text-slate-500 leading-relaxed max-w-md">
+                                      Instagram Stories automatically disappear after 24 hours. @{result.username} has not posted a new story in the past 24 hours.
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setProfileFilter("reels"); setSubTab("reels"); }}
+                                    className="mt-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    <Film className="w-3.5 h-3.5" />
+                                    <span>Browse Available Reels ({reelsCount})</span>
+                                  </button>
+                                </div>
+                              )
+                            ) : profileFilter === "highlight" ? (
+                              /* View 3: Highlight Downloader Hub */
+                              <div className="py-8 px-5 sm:px-8 rounded-3xl bg-white border border-slate-200/80 shadow-md text-center flex flex-col items-center justify-center gap-4 max-w-xl mx-auto animate-fade-in w-full">
+                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 text-white flex items-center justify-center shadow-md">
+                                  <Sparkles className="w-8 h-8" />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-black tracking-widest text-amber-600 uppercase bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                                    Story Highlights Downloader
+                                  </span>
+                                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                                    @{result.username}&apos;s Story Highlights
+                                  </h3>
+                                  <p className="text-xs text-slate-500 leading-relaxed max-w-md">
+                                    Story Highlights are permanently saved story albums on @{result.username}&apos;s profile. Download any highlight by copying its link:
+                                  </p>
+                                </div>
+
+                                <div className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 text-left text-xs text-slate-600 space-y-2">
+                                  <p className="font-bold text-slate-800">📌 Easy Steps to Download Highlights:</p>
+                                  <div className="space-y-1.5 text-[11px]">
+                                    <div className="flex items-start gap-2">
+                                      <span className="w-4 h-4 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-[10px]">1</span>
+                                      <span>Open @{result.username}&apos;s profile on Instagram.</span>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                      <span className="w-4 h-4 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-[10px]">2</span>
+                                      <span>Tap on any Highlight circle (album) you wish to download.</span>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                      <span className="w-4 h-4 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-[10px]">3</span>
+                                      <span>Tap <strong>Share &gt; Copy Link</strong> and paste the link into the search box above!</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row gap-2.5 w-full max-w-sm">
+                                  <a
+                                    href={`https://www.instagram.com/${result.username}/`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow transition-all"
+                                  >
+                                    <ExternalLink className="w-4 h-4" />
+                                    <span>Open @{result.username} Highlights on Instagram</span>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : result.is_private ? (
+                              /* View 4: Private Account Message */
                               <div className="py-10 px-6 rounded-3xl bg-slate-50 border border-slate-200 text-center flex flex-col items-center justify-center gap-3.5">
                                 <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shadow-inner">
                                   <Lock className="w-7 h-7" />
@@ -1378,7 +1586,7 @@ export default function Home() {
                                     This Account is Private
                                   </h3>
                                   <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
-                                    @{result.username} has set their profile to private. Follow them on Instagram to see their {profileFilter === "highlight" ? "highlights" : profileFilter === "story" ? "stories" : profileFilter === "reels" ? "reels" : "photos and videos"}.
+                                    @{result.username} has set their profile to private. Follow them on Instagram to see their {profileFilter === "reels" ? "reels" : profileFilter === "post" ? "posts" : "photos and videos"}.
                                   </p>
                                   <p className="text-[11px] font-bold text-amber-800 bg-amber-100/70 py-1.5 px-3 rounded-lg inline-block mt-2 border border-amber-200">
                                     🔒 Note: Media downloads are only supported for public accounts. Public HD DP is available above.
@@ -1394,46 +1602,27 @@ export default function Home() {
                                 </button>
                               </div>
                             ) : currentFiltered.length === 0 ? (
+                              /* View 5: Empty Media Grid */
                               <div className="py-10 px-5 sm:px-8 rounded-3xl bg-slate-50 border border-slate-200 text-center flex flex-col items-center justify-center gap-3.5 max-w-xl mx-auto">
                                 <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
-                                  {profileFilter === "story" ? (
-                                    <Compass className="w-6 h-6" />
-                                  ) : profileFilter === "highlight" ? (
-                                    <Sparkles className="w-6 h-6" />
-                                  ) : (
-                                    <Film className="w-6 h-6" />
-                                  )}
+                                  <Film className="w-6 h-6" />
                                 </div>
                                 <div className="space-y-2">
                                   <h3 className="text-sm sm:text-base font-black text-slate-800">
-                                    {profileFilter === "story" 
-                                      ? `No Active 24-Hour Stories for @${result.username}`
-                                      : profileFilter === "highlight"
-                                      ? `Highlights Restricted by Instagram for @${result.username}`
-                                      : `No public ${profileFilter} available for @${result.username}`}
+                                    No public {profileFilter} available for @{result.username}
                                   </h3>
                                   <p className="text-xs text-slate-600 leading-relaxed">
-                                    {profileFilter === "story" ? (
-                                      <>
-                                        Instagram Stories automatically expire after <strong>24 hours</strong>. Additionally, Instagram requires user login session to view 24h stories. To save an active story, open Instagram, tap <strong>Share &gt; Copy Link</strong> on the story, and paste the direct link above!
-                                      </>
-                                    ) : profileFilter === "highlight" ? (
-                                      <>
-                                        Instagram restricts highlight media albums behind user login authentication. However, all public <strong>Reels ({result.items?.filter((i: any) => i.category === "reels").length || 0})</strong>, <strong>Posts</strong>, and <strong>HD Profile DP</strong> are available for instant download below!
-                                      </>
-                                    ) : (
-                                      "Try selecting 'All Media' or 'Reels' to download available public content."
-                                    )}
+                                    Try selecting &apos;All Media&apos; or &apos;Reels&apos; to download available public content.
                                   </p>
                                 </div>
 
                                 <button
                                   type="button"
-                                  onClick={() => setProfileFilter("reels")}
+                                  onClick={() => { setProfileFilter("reels"); setSubTab("reels"); }}
                                   className="mt-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                                 >
                                   <Film className="w-3.5 h-3.5" />
-                                  <span>Browse Available Reels ({result.items?.filter((i: any) => i.category === "reels").length || 0})</span>
+                                  <span>Browse Available Reels ({reelsCount})</span>
                                 </button>
                               </div>
                             ) : (
