@@ -55,6 +55,7 @@ Built with **Next.js 16 (Turbopack)** and a robust **Python FastAPI** backend po
 ## ✨ Key Features
 
 ### 📸 Instagram Downloader
+- **Username Media Explorer**: Search any public Instagram `@username` or handle to view full profile stats, HD profile picture (DP), and browse categorized media tabs (**Reels, Posts, Stories, Highlights**) with one-click direct downloads.
 - **Reels Downloader**: Save trending Reels in maximum available bitrate (1080p / 720p MP4).
 - **Post & Photo Saver**: Download single images, multi-image carousel albums, and video posts.
 - **Story & Highlight Saver**: Fetch public Instagram Stories and Highlights with metadata.

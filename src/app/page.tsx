@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { 
-  Flame, Link2, Play, Download, RefreshCw, Film, Image as ImageIcon, Compass, UserCheck, Search, X, ChevronDown, AlertCircle, CheckCircle, Loader2
+  Flame, Link2, Play, Download, RefreshCw, Film, Image as ImageIcon, Compass, UserCheck, Search, X, ChevronDown, AlertCircle, CheckCircle, Loader2, User, Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -513,6 +513,7 @@ export default function Home() {
   const [hasDownloaded, setHasDownloaded] = useState(false);
   const [downloadStatusText, setDownloadStatusText] = useState("");
   const [showIframePreview, setShowIframePreview] = useState(false);
+  const [profileFilter, setProfileFilter] = useState<"all" | "reels" | "post" | "story" | "highlight">("all");
   
   // Set first FAQ open by default (index 0) matching user screenshot
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -565,10 +566,11 @@ export default function Home() {
       return;
     }
     
-    // Smart auto-detection of platform and subTab
+    // Smart auto-detection of platform, subTab, and Instagram username
     const lower = trimmed.toLowerCase();
     const isYt = lower.includes("youtube.com") || lower.includes("youtu.be");
     const isIg = lower.includes("instagram.com");
+    const isUsername = trimmed.startsWith("@") || (/^[a-zA-Z0-9._]{1,30}$/.test(trimmed) && !lower.includes(".com") && !lower.includes(".org") && !lower.includes(".net") && !lower.includes("/") && !lower.includes("?"));
 
     if (isYt) {
       if (platform !== "youtube") setPlatform("youtube");
@@ -588,8 +590,10 @@ export default function Home() {
       else if (isPost && subTab !== "post") setSubTab("post");
       else if (isHighlight && subTab !== "highlight") setSubTab("highlight");
       else if (isStory && subTab !== "story") setSubTab("story");
+    } else if (isUsername) {
+      if (platform !== "instagram") setPlatform("instagram");
     } else {
-      setErrorMsg("Please enter a valid Instagram or YouTube link.");
+      setErrorMsg("Please enter a valid Instagram or YouTube link, or an Instagram @username.");
       return;
     }
 
@@ -599,8 +603,12 @@ export default function Home() {
     setResult(null);
     setShowIframePreview(false);
 
-    const connectingText = langCode === "hi" ? "सर्वर से कनेक्ट हो रहा है..." : "Connecting to media server...";
-    const parsingText = langCode === "hi" ? "मीडिया स्ट्रीम पार्स की जा रही है..." : "Parsing video stream...";
+    const connectingText = isUsername 
+      ? `Fetching Instagram profile for ${trimmed}...`
+      : (langCode === "hi" ? "सर्वर से कनेक्ट हो रहा है..." : "Connecting to media server...");
+    const parsingText = isUsername
+      ? `Extracting Reels, Posts, Stories & Highlights...`
+      : (langCode === "hi" ? "मीडिया स्ट्रीम पार्स की जा रही है..." : "Parsing video stream...");
     const fetchingText = langCode === "hi" ? "डाउनलोड विवरण प्राप्त हो रहे हैं..." : "Fetching download details...";
 
     setLoadingText(connectingText);
@@ -633,7 +641,7 @@ export default function Home() {
 
       if (!response.ok || !data || !data.success) {
         throw new Error(
-          (data && data.detail) || "Unable to extract media from this URL. Please ensure the link is public."
+          (data && data.detail) || "Unable to extract media. Please verify that the account or post is public."
         );
       }
 
@@ -643,27 +651,33 @@ export default function Home() {
         setShowIframePreview(false);
         setHasDownloaded(false);
         setDownloadCompleted(false);
-        setResult({
-          platform: data.platform || (isYt ? "youtube" : "instagram"),
-          video_id: data.video_id || "",
-          user: data.author || (isYt ? "YouTube Creator" : "Instagram Creator"),
-          avatar: data.avatar || data.thumbnail,
-          thumbnail: data.thumbnail || data.avatar || "",
-          type: data.type || "video",
-          title: data.title,
-          duration: data.duration,
-          download_url: data.download_url,
-          options: data.options || [],
-          items: [
-            {
-              id: "1",
-              type: data.type,
-              url: data.thumbnail || data.avatar,
-              tag: data.title,
-              download_url: data.download_url,
-            }
-          ]
-        });
+        setProfileFilter("all");
+
+        if (data.type === "profile") {
+          setResult(data);
+        } else {
+          setResult({
+            platform: data.platform || (isYt ? "youtube" : "instagram"),
+            video_id: data.video_id || "",
+            user: data.author || (isYt ? "YouTube Creator" : "Instagram Creator"),
+            avatar: data.avatar || data.thumbnail,
+            thumbnail: data.thumbnail || data.avatar || "",
+            type: data.type || "video",
+            title: data.title,
+            duration: data.duration,
+            download_url: data.download_url,
+            options: data.options || [],
+            items: [
+              {
+                id: "1",
+                type: data.type,
+                url: data.thumbnail || data.avatar,
+                tag: data.title,
+                download_url: data.download_url,
+              }
+            ]
+          });
+        }
       }, 300);
 
     } catch (err: any) {
@@ -712,6 +726,7 @@ export default function Home() {
     setDownloadCompleted(false);
     setHasDownloaded(false);
     setDownloadStatusText("");
+    setProfileFilter("all");
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -1087,15 +1102,225 @@ export default function Home() {
               )}
             </AnimatePresence>
 
-            {/* Dynamic Results Card Panel - Clean Full Video Player & Solid Blue Download Button */}
+            {/* Dynamic Results Card Panel - Clean Full Video Player & Profile Browser */}
             <AnimatePresence>
               {result && !loading && (
                 <motion.div
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -15 }}
-                  className="mt-8 p-4 sm:p-6 bg-white rounded-3xl text-center max-w-lg mx-auto shadow-2xl shadow-slate-100 flex flex-col items-center gap-5"
+                  className={`mt-8 p-4 sm:p-6 bg-white rounded-3xl text-center ${result.type === "profile" ? "max-w-4xl" : "max-w-lg"} mx-auto shadow-2xl shadow-slate-100 flex flex-col items-center gap-5`}
                 >
+                  {result.type === "profile" ? (
+                    <div className="w-full flex flex-col items-center gap-5">
+                      {/* User Profile Header */}
+                      <div className="w-full flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-100">
+                        <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                          <div className="relative w-20 h-20 sm:w-22 sm:h-22 rounded-full p-1 bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 shadow-md shrink-0">
+                            <img
+                              src={result.avatar || result.thumbnail}
+                              alt={result.username}
+                              className="w-full h-full rounded-full object-cover bg-white"
+                              onError={(e: any) => {
+                                e.currentTarget.src = result.thumbnail || "";
+                              }}
+                            />
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center justify-center sm:justify-start gap-1.5">
+                              <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                                @{result.username}
+                              </h2>
+                              <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                            </div>
+                            {result.full_name && (
+                              <p className="text-sm font-semibold text-slate-700">{result.full_name}</p>
+                            )}
+                            <div className="flex items-center justify-center sm:justify-start gap-3 mt-1.5 text-xs text-slate-500 font-bold">
+                              {result.follower_count && <span>{result.follower_count} Followers</span>}
+                              {result.follower_count && result.post_count && <span>•</span>}
+                              {result.post_count && <span>{result.post_count} Posts</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Direct Download HD DP Button */}
+                        <button
+                          disabled={downloading}
+                          onClick={() => triggerDownloadAction(result.thumbnail || result.download_url, `${result.username}_HD_DP`, "dp")}
+                          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/20 flex items-center gap-2 cursor-pointer shrink-0"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download HD DP</span>
+                        </button>
+                      </div>
+
+                      {/* Real-time Status Alert */}
+                      <AnimatePresence>
+                        {downloading && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                            className="w-full p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm font-bold flex flex-col items-center gap-2 text-center shadow-sm"
+                          >
+                            <div className="flex items-center gap-2 text-amber-800">
+                              <Loader2 className="w-4 h-4 animate-spin shrink-0 text-amber-600" />
+                              <span>Downloading media... Please wait, do not leave this page!</span>
+                            </div>
+                            {downloadProgress !== null && (
+                              <div className="w-full bg-amber-200/70 rounded-full h-2 overflow-hidden mt-1">
+                                <div
+                                  className="bg-amber-600 h-2 rounded-full transition-all duration-300"
+                                  style={{ width: `${downloadProgress}%` }}
+                                />
+                              </div>
+                            )}
+                          </motion.div>
+                        )}
+
+                        {downloadCompleted && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                            className="w-full p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 text-center shadow-sm animate-fade-in"
+                          >
+                            <CheckCircle className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
+                            <span>✅ Download Completed! Video / Image has been saved to your device.</span>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {/* Interactive Category Tabs: Story, Reels, Post, Highlight */}
+                      {(() => {
+                        const reelsCount = result.items?.filter((i: any) => i.category === "reels").length || 0;
+                        const postsCount = result.items?.filter((i: any) => i.category === "post").length || 0;
+                        const storiesCount = result.items?.filter((i: any) => i.category === "story").length || 0;
+                        const highlightsCount = result.items?.filter((i: any) => i.category === "highlight").length || 0;
+                        const totalCount = reelsCount + postsCount + storiesCount + highlightsCount;
+
+                        const filterTabs = [
+                          { id: "all", label: "All Media", count: totalCount },
+                          { id: "reels", label: "Reels", count: reelsCount },
+                          { id: "post", label: "Posts", count: postsCount },
+                          { id: "story", label: "Stories", count: storiesCount },
+                          { id: "highlight", label: "Highlights", count: highlightsCount },
+                        ];
+
+                        const currentFiltered = profileFilter === "all"
+                          ? (result.items?.filter((i: any) => i.category !== "dp") || [])
+                          : (result.items?.filter((i: any) => i.category === profileFilter) || []);
+
+                        return (
+                          <div className="w-full flex flex-col gap-4">
+                            {/* Tabs bar */}
+                            <div className="flex flex-wrap items-center justify-center gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-200/60">
+                              {filterTabs.map((tab) => (
+                                <button
+                                  key={tab.id}
+                                  onClick={() => setProfileFilter(tab.id as any)}
+                                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                    profileFilter === tab.id
+                                      ? "bg-white text-blue-600 shadow-sm border border-slate-200/80"
+                                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                                  }`}
+                                >
+                                  <span>{tab.label}</span>
+                                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                                    profileFilter === tab.id ? "bg-blue-100 text-blue-700" : "bg-slate-200/80 text-slate-600"
+                                  }`}>
+                                    {tab.count}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Items Grid */}
+                            {currentFiltered.length === 0 ? (
+                              <div className="py-12 px-4 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center flex flex-col items-center justify-center gap-2">
+                                <p className="text-sm font-bold text-slate-600">
+                                  No public {profileFilter === "story" ? "stories" : profileFilter === "highlight" ? "highlights" : profileFilter} available for @{result.username}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                  {profileFilter === "story" ? "24-hour stories automatically expire if none were posted in the last 24 hours." : "Try selecting 'All Media' or 'Reels' to download available content."}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-left">
+                                {currentFiltered.map((item: any) => {
+                                  const isItemDownloading = downloading && downloadingOption === item.id;
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
+                                    >
+                                      <div className="relative aspect-square bg-slate-900 overflow-hidden">
+                                        <img
+                                          src={item.thumbnail}
+                                          alt={item.title}
+                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                          onError={(e: any) => {
+                                            e.currentTarget.src = result.avatar || "";
+                                          }}
+                                        />
+                                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/75 text-white text-[10px] font-black uppercase tracking-wider backdrop-blur-xs">
+                                          {item.category}
+                                        </div>
+                                        {item.type === "video" && (
+                                          <div className="absolute top-2 right-2 p-1.5 rounded-full bg-black/65 text-white">
+                                            <Play className="w-3 h-3 fill-current" />
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div className="p-3.5 flex flex-col gap-2.5">
+                                        <h4 className="text-xs font-bold text-slate-800 line-clamp-2 leading-snug">
+                                          {item.title}
+                                        </h4>
+
+                                        <button
+                                          disabled={downloading}
+                                          onClick={() => triggerDownloadAction(item.download_url, `${result.username}_${item.category}_${item.id}`, item.id)}
+                                          className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md ${
+                                            isItemDownloading
+                                              ? "bg-blue-400 text-white cursor-not-allowed"
+                                              : "bg-blue-600 hover:bg-blue-700 text-white active:scale-[0.98] shadow-blue-600/20"
+                                          }`}
+                                        >
+                                          {isItemDownloading ? (
+                                            <>
+                                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                              <span>DOWNLOADING...</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Download className="w-3.5 h-3.5" />
+                                              <span>DOWNLOAD {item.ext?.toUpperCase() || "MEDIA"}</span>
+                                            </>
+                                          )}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Prominent Clear Result Button */}
+                      <button
+                        onClick={handleClearResult}
+                        className="w-full max-w-xs py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 hover:text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border border-slate-200 transition-all cursor-pointer shadow-sm mt-2"
+                      >
+                        <X className="w-4 h-4 text-slate-500" />
+                        <span>{d.clearBtn || "Clear Result"}</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <>
                   {/* Full Playable Video or Full Image Preview */}
                   {result.platform === "youtube" && result.video_id ? (
                     <div className="w-full flex flex-col items-center">
@@ -1273,9 +1498,11 @@ export default function Home() {
                       <span>{d.clearBtn || "Clear Result"}</span>
                     </button>
                   </div>
-                </motion.div>
+                </>
               )}
-            </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
           </div>
         </div>
       </section>

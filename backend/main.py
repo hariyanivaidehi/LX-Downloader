@@ -1,6 +1,7 @@
 import os
 import re
 import html
+import json
 import glob
 import time
 import asyncio
@@ -231,12 +232,163 @@ def extract_youtube(url: str) -> Dict[str, Any]:
         )
 
 
+def pk_to_shortcode(pk: int) -> str:
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+    shortcode = ""
+    while pk > 0:
+        pk, rem = divmod(pk, 64)
+        shortcode = alphabet[rem] + shortcode
+    return shortcode
+
+
+def extract_instagram_user(username: str) -> Dict[str, Any]:
+    """Extract an Instagram user profile with Reels, Posts, Stories, Highlights, and DP."""
+    clean_user = username.strip().lstrip("@").lower()
+    if not clean_user or not re.match(r"^[a-zA-Z0-9._]{1,30}$", clean_user):
+        raise HTTPException(status_code=400, detail="Invalid Instagram username format.")
+
+    url = f"https://www.instagram.com/{clean_user}/"
+    try:
+        resp = requests.get(url, headers=GOOGLEBOT_HEADERS, timeout=12)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Unable to connect to Instagram profile: {str(e)}")
+
+    if resp.status_code == 404:
+        raise HTTPException(status_code=404, detail=f"Instagram user @{clean_user} not found.")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=400, detail=f"Instagram profile returned status {resp.status_code}.")
+
+    raw_html = resp.text
+    if "this account is private" in raw_html.lower():
+        raise HTTPException(status_code=400, detail=f"@{clean_user} is a private account. Media can only be downloaded from public accounts.")
+    if "sorry, this page isn't available" in raw_html.lower():
+        raise HTTPException(status_code=404, detail=f"Instagram profile @{clean_user} is not available.")
+
+    og_title = re.findall(r'<meta property="og:title" content="([^"]+)"', raw_html)
+    og_desc = re.findall(r'<meta property="og:description" content="([^"]+)"', raw_html)
+    og_image = re.findall(r'<meta property="og:image" content="([^"]+)"', raw_html)
+
+    title_str = html.unescape(og_title[0]) if og_title else f"@{clean_user}"
+    desc_str = html.unescape(og_desc[0]) if og_desc else ""
+    avatar_url = html.unescape(og_image[0]) if og_image else ""
+    hd_avatar_url = re.sub(r"s150x150/|s320x320/|s100x100/", "", avatar_url) if avatar_url else ""
+
+    # Parse full name from title_str (e.g. "Full Name (@username) • Instagram...")
+    full_name_match = re.match(r"^(.*?)\s*\(@", title_str)
+    full_name = full_name_match.group(1).strip() if full_name_match else clean_user
+
+    # Parse followers / posts count from desc_str
+    followers_match = re.search(r"([0-9.,MKkmb]+)\s+Followers", desc_str, re.IGNORECASE)
+    follower_count = followers_match.group(1) if followers_match else ""
+
+    posts_match = re.search(r"([0-9.,MKkmb]+)\s+Posts", desc_str, re.IGNORECASE)
+    post_count = posts_match.group(1) if posts_match else ""
+
+    items = []
+
+    # 1. Profile Picture item
+    if hd_avatar_url:
+        items.append({
+            "id": f"dp_{clean_user}",
+            "category": "dp",
+            "type": "image",
+            "title": f"@{clean_user} HD Profile Picture",
+            "thumbnail": hd_avatar_url,
+            "download_url": hd_avatar_url,
+            "ext": "jpg",
+        })
+
+    # 2. Extract Timeline Media (Reels & Posts) from polaris_timeline_connection
+    scripts = re.findall(r'<script type="application/json"[^>]*>(.*?)</script>', raw_html, re.DOTALL)
+    for s in scripts:
+        if "polaris_timeline_connection" in s:
+            try:
+                d = json.loads(s)
+                def find_edges(obj):
+                    if isinstance(obj, dict):
+                        if "polaris_timeline_connection" in obj:
+                            return obj["polaris_timeline_connection"].get("edges", [])
+                        for v in obj.values():
+                            res = find_edges(v)
+                            if res: return res
+                    elif isinstance(obj, list):
+                        for v in obj:
+                            res = find_edges(v)
+                            if res: return res
+                    return None
+
+                edges = find_edges(d)
+                if edges:
+                    for edge in edges:
+                        node = edge.get("node", {})
+                        pk_str = str(node.get("pk") or "")
+                        if not pk_str: continue
+
+                        try:
+                            shortcode = pk_to_shortcode(int(pk_str))
+                        except Exception:
+                            shortcode = node.get("code") or pk_str
+
+                        typename = node.get("__typename", "")
+                        product_type = node.get("product_type", "")
+                        is_video = "Video" in typename or product_type == "clips" or node.get("media_type") == 2
+                        category = "reels" if (product_type == "clips" or is_video) else "post"
+
+                        caption_text = ""
+                        try:
+                            caption_text = node.get("caption", {}).get("text", "")
+                        except Exception:
+                            pass
+
+                        candidates = node.get("image_versions2", {}).get("candidates", [])
+                        thumb = candidates[0].get("url") if candidates else node.get("display_uri")
+
+                        video_versions = node.get("video_versions", [])
+                        direct_url = video_versions[0].get("url") if (video_versions and is_video) else (thumb or "")
+
+                        download_link = direct_url or (f"https://www.instagram.com/reel/{shortcode}/" if is_video else (thumb or f"https://www.instagram.com/p/{shortcode}/"))
+
+                        clean_caption = caption_text.split("\n")[0][:70].strip() if caption_text else ""
+                        item_title = clean_caption or f"@{clean_user} {category.capitalize()} ({shortcode})"
+
+                        items.append({
+                            "id": f"media_{shortcode}",
+                            "pk": pk_str,
+                            "shortcode": shortcode,
+                            "category": category,
+                            "type": "video" if is_video else "image",
+                            "title": item_title,
+                            "thumbnail": thumb,
+                            "download_url": download_link,
+                            "ext": "mp4" if is_video else "jpg",
+                        })
+            except Exception:
+                pass
+
+    return {
+        "success": True,
+        "platform": "instagram",
+        "type": "profile",
+        "username": clean_user,
+        "full_name": full_name,
+        "avatar": avatar_url or hd_avatar_url,
+        "thumbnail": hd_avatar_url or avatar_url,
+        "bio": desc_str,
+        "follower_count": follower_count,
+        "post_count": post_count,
+        "title": f"@{clean_user}'s Instagram Profile",
+        "download_url": hd_avatar_url,
+        "items": items,
+    }
+
+
 def extract_instagram(url: str) -> Dict[str, Any]:
     """Extract Instagram Reel, Post, DP, Story, or Highlight details."""
     clean_url = url.split("?")[0].rstrip("/") + "/"
     is_private_detected = False
     
-    # Check if this is a profile DP URL (e.g. instagram.com/username/)
+    # Check if this is a profile URL (e.g. instagram.com/username/)
     profile_match = re.search(r"instagram\.com/([a-zA-Z0-9._]+)/?$", clean_url)
     is_not_reserved = profile_match and profile_match.group(1).lower() not in [
         "p", "reel", "reels", "stories", "tv", "explore", "direct"
@@ -245,31 +397,7 @@ def extract_instagram(url: str) -> Dict[str, Any]:
     if is_not_reserved:
         username = profile_match.group(1)
         try:
-            # Use Googlebot to fetch profile page without rate limits
-            resp = requests.get(f"https://www.instagram.com/{username}/", headers=GOOGLEBOT_HEADERS, timeout=10)
-            if resp.status_code == 200:
-                og_image = re.findall(r'<meta property="og:image" content="([^"]+)"', resp.text)
-                og_title = re.findall(r'<meta property="og:title" content="([^"]+)"', resp.text)
-                
-                if og_image:
-                    pic_url = html.unescape(og_image[0])
-                    hd_pic_url = re.sub(r"s150x150/|s320x320/|s100x100/", "", pic_url)
-                    title = html.unescape(og_title[0]) if og_title else f"@{username}'s Profile Picture"
-                    
-                    return {
-                        "success": True,
-                        "platform": "instagram",
-                        "type": "image",
-                        "title": title,
-                        "author": username,
-                        "avatar": pic_url,
-                        "thumbnail": hd_pic_url,
-                        "duration": None,
-                        "download_url": hd_pic_url,
-                        "options": [
-                            {"id": "hd_image", "label": "Full HD Profile Picture (JPG)", "ext": "jpg", "url": hd_pic_url}
-                        ],
-                    }
+            return extract_instagram_user(username)
         except Exception:
             pass
 
@@ -400,7 +528,7 @@ def health_check():
 @app.get("/api/extract")
 @app.get("/api/py/extract")
 @app.get("/extract")
-def extract_media(url: str = Query(..., description="The media URL to extract")):
+def extract_media(url: str = Query(..., description="The media URL or Instagram @username to extract")):
     if not url or not url.strip():
         raise HTTPException(status_code=400, detail="URL cannot be empty.")
     
@@ -410,11 +538,16 @@ def extract_media(url: str = Query(..., description="The media URL to extract"))
         return extract_youtube(url.strip())
     elif "instagram.com" in trimmed:
         return extract_instagram(url.strip())
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail="Unsupported link. Please provide a valid Instagram or YouTube URL."
-        )
+    
+    # Check if this is an Instagram username (@username or alphanumeric handle)
+    clean_handle = trimmed.lstrip("@").strip()
+    if re.match(r"^[a-zA-Z0-9._]{1,30}$", clean_handle) and not any(ext in clean_handle for ext in [".com", ".org", ".net", ".io", "http", "/", "watch?"]):
+        return extract_instagram_user(clean_handle)
+    
+    raise HTTPException(
+        status_code=400,
+        detail="Unsupported link or username. Please provide a valid Instagram or YouTube URL, or an Instagram @username."
+    )
 
 
 @app.get("/api/download")
