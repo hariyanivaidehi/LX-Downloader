@@ -1360,13 +1360,47 @@ export default function Home() {
                                 </button>
                               </div>
                             ) : currentFiltered.length === 0 ? (
-                              <div className="py-12 px-4 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center flex flex-col items-center justify-center gap-2">
-                                <p className="text-sm font-bold text-slate-600">
-                                  No public {profileFilter === "story" ? "stories" : profileFilter === "highlight" ? "highlights" : profileFilter} available for @{result.username}
-                                </p>
-                                <p className="text-xs text-slate-400">
-                                  {profileFilter === "story" ? "24-hour stories automatically expire if none were posted in the last 24 hours." : "Try selecting 'All Media' or 'Reels' to download available content."}
-                                </p>
+                              <div className="py-10 px-5 sm:px-8 rounded-3xl bg-slate-50 border border-slate-200 text-center flex flex-col items-center justify-center gap-3.5 max-w-xl mx-auto">
+                                <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
+                                  {profileFilter === "story" ? (
+                                    <Compass className="w-6 h-6" />
+                                  ) : profileFilter === "highlight" ? (
+                                    <Sparkles className="w-6 h-6" />
+                                  ) : (
+                                    <Film className="w-6 h-6" />
+                                  )}
+                                </div>
+                                <div className="space-y-2">
+                                  <h3 className="text-sm sm:text-base font-black text-slate-800">
+                                    {profileFilter === "story" 
+                                      ? `No Active 24-Hour Stories for @${result.username}`
+                                      : profileFilter === "highlight"
+                                      ? `Highlights Restricted by Instagram for @${result.username}`
+                                      : `No public ${profileFilter} available for @${result.username}`}
+                                  </h3>
+                                  <p className="text-xs text-slate-600 leading-relaxed">
+                                    {profileFilter === "story" ? (
+                                      <>
+                                        Instagram Stories automatically expire after <strong>24 hours</strong>. Additionally, Instagram requires user login session to view 24h stories. To save an active story, open Instagram, tap <strong>Share &gt; Copy Link</strong> on the story, and paste the direct link above!
+                                      </>
+                                    ) : profileFilter === "highlight" ? (
+                                      <>
+                                        Instagram restricts highlight media albums behind user login authentication. However, all public <strong>Reels ({result.items?.filter((i: any) => i.category === "reels").length || 0})</strong>, <strong>Posts</strong>, and <strong>HD Profile DP</strong> are available for instant download below!
+                                      </>
+                                    ) : (
+                                      "Try selecting 'All Media' or 'Reels' to download available public content."
+                                    )}
+                                  </p>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setProfileFilter("reels")}
+                                  className="mt-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Film className="w-3.5 h-3.5" />
+                                  <span>Browse Available Reels ({result.items?.filter((i: any) => i.category === "reels").length || 0})</span>
+                                </button>
                               </div>
                             ) : (
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-left">
