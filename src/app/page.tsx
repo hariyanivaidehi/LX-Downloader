@@ -489,15 +489,12 @@ export default function Home() {
   const [platform, setPlatform] = useState<"instagram" | "youtube">("instagram");
   
   // Level 2: Sub-tab selection (Instagram: Reels, Post, Story, DP, Highlight; YouTube: Video, Shorts)
-  const [subTab, setSubTab] = useState<string>("reels");
+  // Null by default so no option is pre-selected
+  const [subTab, setSubTab] = useState<string | null>(null);
 
-  // Reset sub-tab when parent platform changes
+  // Reset sub-tab to null when parent platform changes so no tab is pre-selected
   useEffect(() => {
-    if (platform === "youtube") {
-      setSubTab("youtubeVideo");
-    } else {
-      setSubTab("reels");
-    }
+    setSubTab(null);
   }, [platform]);
 
   const [inputUrl, setInputUrl] = useState("");
@@ -545,7 +542,7 @@ export default function Home() {
 
   const handlePlatformClick = (newPlatform: "instagram" | "youtube") => {
     setPlatform(newPlatform);
-    setSubTab(newPlatform === "youtube" ? "youtubeVideo" : "reels");
+    setSubTab(null);
     setInputUrl("");
     setErrorMsg("");
     setResult(null);
@@ -553,18 +550,17 @@ export default function Home() {
   };
 
   const handleSubTabClick = (tabId: string) => {
-    setSubTab(tabId);
+    // Toggle: if already selected, clicking it again unselects it (sets to null)
+    const nextTab = subTab === tabId ? null : tabId;
+    setSubTab(nextTab);
     setErrorMsg("");
     setHasDownloaded(false);
     if (result && result.type === "profile") {
-      if (tabId === "post" || tabId === "reels" || tabId === "story" || tabId === "highlight") {
-        setProfileFilter(tabId as any);
+      if (nextTab === "post" || nextTab === "reels" || nextTab === "story" || nextTab === "highlight") {
+        setProfileFilter(nextTab as any);
       } else {
         setProfileFilter("all");
       }
-    } else {
-      setInputUrl("");
-      setResult(null);
     }
   };
 
@@ -880,9 +876,22 @@ export default function Home() {
   // Get active localization vocabulary
   const d = VOCABULARY[langCode] || VOCABULARY.en;
   
+  // Default platform descriptions when no sub-tab is selected
+  const defaultPlatformTexts = platform === "youtube"
+    ? {
+        title: langCode === "hi" ? "यूट्यूब वीडियो और शॉर्ट्स डाउनलोडर" : "YouTube Video & Shorts Downloader",
+        text1: langCode === "hi" ? "यूट्यूब से कोई भी वीडियो, शॉर्ट्स या ऑडियो आसानी से डाउनलोड करें।" : "Download YouTube Videos and Shorts in 1080p, 720p, 480p, 360p or MP3 format.",
+        text2: langCode === "hi" ? "ऊपर दिए गए बॉक्स में कोई भी यूट्यूब लिंक पेस्ट करें और तुरंत डाउनलोड करें।" : "Paste any YouTube link in the search bar above to fetch and save your media."
+      }
+    : {
+        title: langCode === "hi" ? "इंस्टाग्राम रील्स, पोस्ट, स्टोरी और डीपी डाउनलोडर" : "Instagram Reels, Posts, Stories & Highlights Downloader",
+        text1: langCode === "hi" ? "इंस्टाग्राम से कोई भी रील, पोस्ट फोटो, स्टोरी या प्रोफाइल डीपी एचडी क्वालिटी में डाउनलोड करें।" : "Download Instagram Reels, Posts, Stories, DP, and Highlights in high definition.",
+        text2: langCode === "hi" ? "ऊपर दिए गए बॉक्स में लिंक पेस्ट करें या @username लिखकर सर्च करें।" : "Paste any Instagram link or enter an @username to view and download all media."
+      };
+
   // Get active tab descriptions and details from localized dictionary
-  const fallbackTexts = VOCABULARY.en.tabTexts[subTab] || VOCABULARY.en.tabTexts.reels;
-  const desc = d.tabTexts ? (d.tabTexts[subTab] || fallbackTexts) : fallbackTexts;
+  const activeTabTexts = subTab && d.tabTexts ? (d.tabTexts[subTab] || VOCABULARY.en.tabTexts[subTab]) : null;
+  const desc = activeTabTexts || defaultPlatformTexts;
 
   // Fallback to English steps/faqs if the selected language does not define them
   const steps = d.steps || VOCABULARY.en.steps;
@@ -1008,18 +1017,20 @@ export default function Home() {
                       { id: "highlight", label: "Highlight", icon: Download }
                     ].map((tab) => {
                       const Icon = tab.icon;
+                      const isSelected = subTab === tab.id;
                       return (
                         <button
                           key={tab.id}
+                          type="button"
                           onClick={() => handleSubTabClick(tab.id)}
                           className={`flex items-center justify-center gap-1.5 sm:gap-2 py-2 px-3 sm:py-3 sm:px-6 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
-                            subTab === tab.id
-                              ? "bg-white text-blue-600 shadow-md"
-                              : "bg-white/40 text-slate-600 hover:bg-white"
+                            isSelected
+                              ? "bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-[1.02]"
+                              : "bg-white/70 hover:bg-white text-slate-700 hover:text-slate-900 border border-slate-200/80 shadow-xs"
                           }`}
                         >
-                          <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          {tab.label}
+                          <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isSelected ? "text-white" : "text-slate-500"}`} />
+                          <span>{tab.label}</span>
                         </button>
                       );
                     })}
@@ -1038,18 +1049,20 @@ export default function Home() {
                       { id: "youtubeShorts", label: "Shorts", icon: Film }
                     ].map((tab) => {
                       const Icon = tab.icon;
+                      const isSelected = subTab === tab.id;
                       return (
                         <button
                           key={tab.id}
+                          type="button"
                           onClick={() => handleSubTabClick(tab.id)}
                           className={`flex items-center justify-center gap-1.5 sm:gap-2 py-2 px-4 sm:py-3 sm:px-6 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
-                            subTab === tab.id
-                              ? "bg-white text-blue-600 shadow-md"
-                              : "bg-white/40 text-slate-600 hover:bg-white"
+                            isSelected
+                              ? "bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-[1.02]"
+                              : "bg-white/70 hover:bg-white text-slate-700 hover:text-slate-900 border border-slate-200/80 shadow-xs"
                           }`}
                         >
-                          <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          {tab.label}
+                          <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isSelected ? "text-white" : "text-slate-500"}`} />
+                          <span>{tab.label}</span>
                         </button>
                       );
                     })}
@@ -1334,6 +1347,8 @@ export default function Home() {
                                     setProfileFilter(tab.id as any);
                                     if (tab.id === "post" || tab.id === "reels" || tab.id === "story" || tab.id === "highlight") {
                                       setSubTab(tab.id);
+                                    } else {
+                                      setSubTab(null);
                                     }
                                   }}
                                   className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
