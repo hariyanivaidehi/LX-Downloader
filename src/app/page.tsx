@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { 
-  Flame, Link2, Play, Download, RefreshCw, Film, Image as ImageIcon, Compass, UserCheck, Search, X, ChevronDown, AlertCircle, CheckCircle, Loader2, User, Sparkles, Lock
+  Flame, Link2, Play, Download, RefreshCw, Film, Image as ImageIcon, Compass, UserCheck, Search, X, ChevronDown, AlertCircle, CheckCircle, Loader2, User, UserX, Sparkles, Lock, ExternalLink
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -44,7 +44,7 @@ const VOCABULARY: Record<string, Record<string, any>> = {
   en: { 
     instagramText: "DOWNLOAD ALL INSTAGRAM STUFF HERE!", 
     youtubeText: "DOWNLOAD ALL YOUTUBE VIDEOS & AUDIO HERE!", 
-    pastePlaceholder: "Paste valid link here...", 
+    pastePlaceholder: "Paste link or enter @username (e.g. https://... or @natgeo)", 
     searchBtn: "SEARCH", 
     pasteBtn: "Paste", 
     howTo: "How to Save Content in 3 Steps", 
@@ -104,7 +104,7 @@ const VOCABULARY: Record<string, Record<string, any>> = {
   hi: { 
     instagramText: "यहाँ सभी इंस्टाग्राम सामग्री डाउनलोड करें!", 
     youtubeText: "यहाँ सभी यूट्यूब वीडियो और ऑडियो डाउनलोड करें!", 
-    pastePlaceholder: "वैध लिंक यहाँ पेस्ट करें...", 
+    pastePlaceholder: "लिंक पेस्ट करें या @यूज़रनेम दर्ज करें (उदा. https://... या @natgeo)", 
     searchBtn: "खोजें", 
     pasteBtn: "पेस्ट", 
     howTo: "3 आसान चरणों में डाउनलोड करें", 
@@ -164,7 +164,7 @@ const VOCABULARY: Record<string, Record<string, any>> = {
   bn: { 
     instagramText: "এখানে সমস্ত ইনস্টাগ্রাম মিডিয়া ডাউনলোড করুন!", 
     youtubeText: "এখানে সমস্ত ইউটিউব ভিডিও ও অডিও ডাউনলোড করুন!", 
-    pastePlaceholder: "সঠিক লিঙ্কটি এখানে পেস্ট করুন...", 
+    pastePlaceholder: "লিঙ্ক পেস্ট করুন অথবা @ইউজারনেম লিখুন (যেমন https://... বা @handle)", 
     searchBtn: "অনুসন্ধান", 
     pasteBtn: "পেস্ট", 
     howTo: "৩টি সহজ ধাপে ডাউনলোড করুন", 
@@ -206,7 +206,7 @@ const VOCABULARY: Record<string, Record<string, any>> = {
       },
       highlight: {
         title: "ইনস্টাগ্রাম হাইলাইট ডাউনলোড",
-        text1: "প্রোফাইলের হাইলাইট স্টোরিগুলো সরাসরি উচ্চ রেজোলিউশনে সেভ করে নিন।",
+        text1: "প্রোফাইলের হাইলাইট স্টোরিগুলো সরাসরি उच्च রেজোলিউশনে সেভ করে নিন।",
         text2: "হাইলাইটের লিঙ্ক দিন এবং সমস্ত ছবি ও ভিডিও একসাথে সেভ করুন।"
       },
       youtubeVideo: {
@@ -224,7 +224,7 @@ const VOCABULARY: Record<string, Record<string, any>> = {
   te: { 
     instagramText: "ఇక్కడ అన్ని ఇన్‌స్టాగ్రామ్ మీడియా డౌన్‌లోడ్ చేసుకోండి!", 
     youtubeText: "ఇక్కడ అన్ని యూట్యూబ్ వీడియోలను డౌన్‌లోడ్ చేయండి!", 
-    pastePlaceholder: "లింక్ ఇక్కడ అతికించండి...", 
+    pastePlaceholder: "లింక్ అతికించండి లేదా @యూజర్‌నేమ్ నమోదు చేయండి (ఉదా. https://... లేదా @handle)", 
     searchBtn: "శోధించండి", 
     pasteBtn: "అతికించు", 
     howTo: "3 దశల్లో కంటెంట్ సేవ్ చేయండి", 
@@ -284,7 +284,7 @@ const VOCABULARY: Record<string, Record<string, any>> = {
   kn: {
     instagramText: "ಇಲ್ಲಿ ಎಲ್ಲಾ ಇನ್‌ಸ್ಟಾಗ್ರಾಮ್ ಮಾಧ್ಯಮಗಳನ್ನು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ!",
     youtubeText: "ಇಲ್ಲಿ ಎಲ್ಲಾ ಯೂಟ್ಯೂಬ್ ವೀಡಿಯೊಗಳನ್ನು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ!",
-    pastePlaceholder: "ಲಿಂಕ್ ಅನ್ನು ಇಲ್ಲಿ ಅಂಟಿಸಿ...",
+    pastePlaceholder: "ಲಿಂಕ್ ಅಂಟಿಸಿ ಅಥವಾ @ಬಳಕೆದಾರ ಹೆಸರು ನಮೂದಿಸಿ (ಉದಾ. https://... ಅಥವಾ @handle)",
     searchBtn: "ಹುಡುಕಿ",
     pasteBtn: "ಅಂಟಿಸಿ",
     howTo: "3 ಸುಲಭ ಹಂತಗಳಲ್ಲಿ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
@@ -344,7 +344,7 @@ const VOCABULARY: Record<string, Record<string, any>> = {
   ml: {
     instagramText: "എല്ലാ ഇൻസ്റ്റാഗ്രാം മീഡിയയും ഇവിടെ ഡൗൺലോഡ് ചെയ്യുക!",
     youtubeText: "എല്ലാ യൂറ്റ്യൂബ് വീഡിയോകളും ഇവിടെ ഡൗൺലോഡ് ചെയ്യുക!",
-    pastePlaceholder: "ലിങ്ക് ഇവിടെ ഒട്ടിക്കുക...",
+    pastePlaceholder: "ലിങ്ക് ഒട്ടിക്കുക അല്ലെങ്കിൽ @യൂസർനെയിം നൽകുക (ഉദാ. https://... അല്ലെങ്കിൽ @handle)",
     searchBtn: "തിരയുക",
     pasteBtn: "ഒട്ടിക്കുക",
     howTo: "3 ലളിതമായ ഘട്ടങ്ങളിലൂടെ സേവ് ചെയ്യാം",
@@ -404,7 +404,7 @@ const VOCABULARY: Record<string, Record<string, any>> = {
   mr: {
     instagramText: "येथे सर्व इंस्टाग्राम मीडिया डाउनलोड करा!",
     youtubeText: "येथे सर्व यूट्यूब व्हिडिओ डाउनलोड करा!",
-    pastePlaceholder: "लिंक येथे पेस्ट करा...",
+    pastePlaceholder: "येथे लिंक पेस्ट करा किंवा @वापरकर्ता नाव टाका (उदा. https://... किंवा @handle)",
     searchBtn: "शोधा",
     pasteBtn: "पेस्ट करा",
     howTo: "3 सोप्या पायऱ्यांमध्ये डाउनलोड करा",
@@ -514,12 +514,21 @@ export default function Home() {
   const [downloadStatusText, setDownloadStatusText] = useState("");
   const [showIframePreview, setShowIframePreview] = useState(false);
   const [profileFilter, setProfileFilter] = useState<"all" | "reels" | "post" | "story" | "highlight">("all");
+  const [stepsMethod, setStepsMethod] = useState<"link" | "username">("link");
+  const [previewStreamUrl, setPreviewStreamUrl] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState(false);
   
   // Set first FAQ open by default (index 0) matching user screenshot
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const downloaderRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Reset media preview fallbacks whenever result changes
+  useEffect(() => {
+    setPreviewStreamUrl(null);
+    setPreviewError(false);
+  }, [result]);
 
   // Client-side query parameters parsing (avoids React Suspense bailout)
   const [langCode, setLangCode] = useState("en");
@@ -757,9 +766,22 @@ export default function Home() {
     const title = filename || result?.title || result?.items?.[0]?.tag || "LX_Media_Download";
     const ext = url.includes(".mp3") || optId === "audio" ? "mp3" : (url.includes(".jpg") || url.includes(".png") || result?.type?.toLowerCase().includes("image") ? "jpg" : "mp4");
     const cleanFilename = `${title.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50)}.${ext}`;
-    
-    // Call the Python backend proxy endpoint to force native attachment download
-    const proxyDownloadUrl = `/api/py/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanFilename)}`;
+
+    // Call the Python backend proxy endpoint with quality selection and native attachment download
+    let proxyDownloadUrl = "";
+    if (url.startsWith("/api/download") || url.startsWith("/api/py/download") || url.startsWith("/download")) {
+      const query = url.includes("?") ? url.split("?")[1] : "";
+      const params = new URLSearchParams(query);
+      if (!params.get("filename")) params.set("filename", cleanFilename);
+      if (optId && !params.get("quality")) params.set("quality", optId);
+      proxyDownloadUrl = `/api/py/download?${params.toString()}`;
+    } else {
+      let endpointParams = `url=${encodeURIComponent(url)}&filename=${encodeURIComponent(cleanFilename)}`;
+      if (optId) endpointParams += `&quality=${encodeURIComponent(optId)}`;
+      if (result?.platform) endpointParams += `&source=${encodeURIComponent(result.platform)}`;
+      if (result?.video_id) endpointParams += `&video_id=${encodeURIComponent(result.video_id)}`;
+      proxyDownloadUrl = `/api/py/download?${endpointParams}`;
+    }
 
     try {
       const res = await fetch(proxyDownloadUrl);
@@ -851,6 +873,42 @@ export default function Home() {
   // Fallback to English steps/faqs if the selected language does not define them
   const steps = d.steps || VOCABULARY.en.steps;
   const faqs = d.faqs || VOCABULARY.en.faqs;
+
+  const linkSteps = [
+    {
+      num: "01",
+      title: "Copy Media Link",
+      desc: "Open Instagram or YouTube, choose any Reel, Video, Shorts, Post or Story, tap Share and Copy Link."
+    },
+    {
+      num: "02",
+      title: "Paste into LX-Downloader",
+      desc: "Paste the copied URL into the input box above. Our intelligent parser automatically identifies the media."
+    },
+    {
+      num: "03",
+      title: "Pick Quality & Download",
+      desc: "Select your desired resolution (1080p Full HD, 720p, 480p, 360p, or MP3) and click Download Now."
+    }
+  ];
+
+  const usernameSteps = [
+    {
+      num: "01",
+      title: "Enter Instagram @username",
+      desc: "Type or paste any Instagram profile username (e.g. @natgeo or cristiano) into the search bar above."
+    },
+    {
+      num: "02",
+      title: "Browse Profile Media",
+      desc: "Our engine retrieves the profile, organizing all public Stories, Reels, Posts, and Highlights with counts."
+    },
+    {
+      num: "03",
+      title: "Download Any Item or HD DP",
+      desc: "Filter by category to download any video/photo directly, or grab the original high-resolution Profile DP."
+    }
+  ];
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 text-slate-900 overflow-x-clip transition-colors duration-300">
@@ -1053,10 +1111,29 @@ export default function Home() {
                 <motion.div
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-3.5 p-3.5 rounded-xl bg-red-50 border border-red-200/80 text-red-700 text-xs sm:text-sm font-semibold flex items-center gap-2.5 text-left shadow-sm max-w-xl mx-auto"
+                  className={`mt-4 p-4 rounded-2xl border text-left shadow-sm max-w-xl mx-auto flex items-start gap-3.5 ${
+                    errorMsg.includes("No such user found") || errorMsg.includes("આવો કોઈ યુઝર નથી")
+                      ? "bg-amber-50/95 border-amber-300 text-amber-950 shadow-amber-500/5"
+                      : "bg-red-50 border-red-200/80 text-red-700"
+                  }`}
                 >
-                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                  <span>{errorMsg}</span>
+                  {errorMsg.includes("No such user found") || errorMsg.includes("આવો કોઈ યુઝર નથી") ? (
+                    <div className="w-10 h-10 rounded-xl bg-amber-200/80 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+                      <UserX className="w-5 h-5" />
+                    </div>
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 space-y-1">
+                    <h4 className="text-xs sm:text-sm font-black tracking-tight">
+                      {errorMsg.includes("No such user found") || errorMsg.includes("આવો કોઈ યુઝર નથી")
+                        ? "User Not Found (આવો કોઈ યુઝર નથી)"
+                        : "Download Notice"}
+                    </h4>
+                    <p className="text-xs sm:text-sm font-medium leading-relaxed opacity-90">
+                      {errorMsg}
+                    </p>
+                  </div>
                 </motion.div>
               )}
             </div>
@@ -1419,22 +1496,47 @@ export default function Home() {
                       </div>
                     </div>
                   ) : (
-                    <div className="w-full max-w-md rounded-2xl overflow-hidden bg-black shadow-lg flex items-center justify-center relative">
+                    <div className="w-full max-w-md rounded-2xl overflow-hidden bg-black shadow-lg flex flex-col items-center justify-center relative">
                       {result.type === "video" || result.download_url?.includes(".mp4") ? (
                         <video
-                          src={result.download_url}
+                          key={previewStreamUrl || result.download_url}
+                          src={previewStreamUrl || result.download_url}
                           poster={result.thumbnail || result.avatar}
                           controls
                           playsInline
                           preload="metadata"
-                          className="w-full max-h-[540px] object-contain mx-auto"
+                          {...({ referrerPolicy: "no-referrer" } as any)}
+                          onError={() => {
+                            // If direct CDN stream fails due to CORS or referer policy, switch to backend streaming proxy
+                            if (!previewStreamUrl && result.download_url) {
+                              setPreviewStreamUrl(`/api/py/stream?url=${encodeURIComponent(result.download_url)}`);
+                            } else {
+                              setPreviewError(true);
+                            }
+                          }}
+                          className="w-full max-h-[480px] object-contain mx-auto"
                         />
                       ) : (
                         <img
                           src={result.download_url || result.thumbnail || result.avatar}
                           alt="Media Preview"
-                          className="w-full max-h-[540px] object-contain mx-auto"
+                          referrerPolicy="no-referrer"
+                          className="w-full max-h-[480px] object-contain mx-auto"
                         />
+                      )}
+                      {previewError && (
+                        <div className="p-3 bg-slate-900 w-full text-center text-xs text-slate-300 flex items-center justify-center gap-2">
+                          <span>Preview playback blocked by CDN.</span>
+                          <a
+                            href={`/api/py/stream?url=${encodeURIComponent(result.download_url)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:underline font-bold inline-flex items-center gap-1"
+                          >
+                            <span>Open Stream</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1511,28 +1613,62 @@ export default function Home() {
                       )}
                     </AnimatePresence>
 
-                    {/* Carousel Items or Additional Format Options */}
-                    {result.options && result.options.length > 0 && (
-                      <div className="flex flex-wrap gap-2 pt-1 justify-center">
-                        {result.options.map((opt: any) => (
-                          <button
-                            key={opt.id}
-                            disabled={downloading}
-                            onClick={() => triggerDownloadAction(opt.url, (result.title || "Media") + "_" + opt.id, opt.id)}
-                            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95 border flex items-center gap-1.5 ${
-                              downloadingOption === opt.id
-                                ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                                : "bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 border-slate-200"
-                            }`}
-                          >
-                            {downloadingOption === opt.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : null}
-                            {hasDownloaded ? `Download Again (${opt.label})` : opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {/* Quality & Format Selection Section */}
+                    {(() => {
+                      const videoOpts = (result.options && result.options.length > 0)
+                        ? result.options
+                        : (result.type === "video" || result.download_url?.includes(".mp4"))
+                        ? [
+                            { id: "1080p", label: "Full HD (1080p)", ext: "mp4", url: result.download_url },
+                            { id: "720p", label: "HD Video (720p)", ext: "mp4", url: result.download_url },
+                            { id: "480p", label: "Medium (480p)", ext: "mp4", url: result.download_url },
+                            { id: "360p", label: "Standard (360p)", ext: "mp4", url: result.download_url },
+                            { id: "audio", label: "Audio Only (MP3)", ext: "mp3", url: result.download_url },
+                          ]
+                        : [];
+
+                      if (videoOpts.length === 0) return null;
+
+                      return (
+                        <div className="w-full mt-2 pt-4 border-t border-slate-100 flex flex-col items-center gap-2.5">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-slate-600 uppercase tracking-wider">
+                            <Film className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Select Quality / Resolution</span>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full">
+                            {videoOpts.map((opt: any) => {
+                              const isOptDownloading = downloading && downloadingOption === opt.id;
+                              return (
+                                <button
+                                  key={opt.id}
+                                  disabled={downloading}
+                                  onClick={() => triggerDownloadAction(opt.url, (result.title || "Media") + "_" + opt.id, opt.id)}
+                                  className={`p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 border flex flex-col items-center justify-center gap-1 text-center ${
+                                    isOptDownloading
+                                      ? "bg-blue-600 text-white border-blue-600 shadow-md"
+                                      : "bg-slate-50 hover:bg-blue-50 hover:text-blue-600 text-slate-700 border-slate-200"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 font-black text-xs sm:text-sm">
+                                    {isOptDownloading ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-black uppercase">
+                                        {opt.ext || "MP4"}
+                                      </span>
+                                    )}
+                                    <span>{opt.id.toUpperCase()}</span>
+                                  </div>
+                                  <span className="text-[11px] opacity-80 font-medium">
+                                    {opt.label}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Prominent, Clearly Visible Clear Result Button */}
                     <button
@@ -1580,25 +1716,56 @@ export default function Home() {
         className="bg-slate-50 border-t border-slate-100 py-16 px-4 sm:px-6 lg:px-8"
       >
         <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-12">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-4">
+          <div className="text-center max-w-2xl mx-auto mb-10">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-3">
               {d.howTo}
             </h2>
+            <p className="text-xs sm:text-sm text-slate-500 mb-6">
+              Select your download method below for step-by-step guidance:
+            </p>
+
+            {/* Dual Methods Switcher */}
+            <div className="inline-flex p-1.5 rounded-2xl bg-white border border-slate-200/80 shadow-sm max-w-md w-full mx-auto">
+              <button
+                type="button"
+                onClick={() => setStepsMethod("link")}
+                className={`flex-1 py-2.5 px-3 sm:px-5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  stepsMethod === "link"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/25"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                }`}
+              >
+                <Link2 className="w-4 h-4" />
+                <span>Method 1: By Link (URL)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStepsMethod("username")}
+                className={`flex-1 py-2.5 px-3 sm:px-5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  stepsMethod === "username"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/25"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                }`}
+              >
+                <User className="w-4 h-4" />
+                <span>Method 2: By Username</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-8">
-            {steps.map((step: any) => (
+          <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
+            {(stepsMethod === "link" ? linkSteps : usernameSteps).map((step: any) => (
               <div
                 key={step.num}
-                className="relative w-full sm:w-[calc(50%-16px)] lg:w-[calc(33.333%-22px)] bg-white p-6 sm:p-8 rounded-2xl hover:shadow-lg transition-all duration-300"
+                className="relative w-full sm:w-[calc(50%-16px)] lg:w-[calc(33.333%-22px)] bg-white p-6 sm:p-8 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 border border-slate-100"
               >
-                <span className="text-4xl sm:text-5xl font-black text-blue-600/40 absolute top-4 right-6 font-mono select-none">
+                <span className="text-4xl sm:text-5xl font-black text-blue-600/30 absolute top-4 right-6 font-mono select-none">
                   {step.num}
                 </span>
-                <h3 className="text-lg font-bold text-slate-900 mb-3 mt-1 pr-12">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-2.5 mt-1 pr-12">
                   {step.title}
                 </h3>
-                <p className="text-sm text-slate-500 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
                   {step.desc}
                 </p>
               </div>

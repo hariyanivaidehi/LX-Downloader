@@ -6,6 +6,8 @@ import glob
 import time
 import asyncio
 import urllib.parse
+import hashlib
+import subprocess
 from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, Query, HTTPException
@@ -117,6 +119,8 @@ def download_youtube_media(video_id: str, quality: str = "720p") -> str:
     else:
         if quality == "1080p":
             format_spec = "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
+        elif quality == "480p":
+            format_spec = "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480]/best"
         elif quality == "360p":
             format_spec = "bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=360]+bestaudio/best[height<=360]/best"
         else:  # 720p or default
@@ -142,6 +146,107 @@ def download_youtube_media(video_id: str, quality: str = "720p") -> str:
             return m
 
     raise RuntimeError("YouTube media download failed to produce a valid output file.")
+
+
+def transcode_video(media_url: str, quality: str = "1080p") -> Optional[str]:
+    """Download and scale/convert video into cache using ffmpeg with faststart moov flags."""
+    cleanup_cache()
+    if not FFMPEG_EXE or not media_url:
+        return None
+
+    # Derive stable key from URL and desired quality
+    url_hash = hashlib.md5(f"{media_url}_{quality}".encode()).hexdigest()[:16]
+    ext = "mp3" if quality == "audio" else "mp4"
+    target_path = os.path.join(CACHE_DIR, f"trans_{url_hash}_{quality}.{ext}")
+
+    if os.path.exists(target_path) and os.path.getsize(target_path) > 1024:
+        return target_path
+
+    temp_output = target_path + f".tmp.{ext}"
+    headers_opt = "Referer: https://www.instagram.com/\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n"
+
+    if quality == "audio":
+        cmd = [
+            FFMPEG_EXE, "-y",
+            "-headers", headers_opt,
+            "-i", media_url,
+            "-vn",
+            "-c:a", "libmp3lame",
+            "-b:a", "192k",
+            temp_output
+        ]
+    elif quality == "1080p":
+        cmd = [
+            FFMPEG_EXE, "-y",
+            "-headers", headers_opt,
+            "-i", media_url,
+            "-c:v", "copy",
+            "-c:a", "copy",
+            "-movflags", "+faststart",
+            temp_output
+        ]
+    elif quality == "720p":
+        cmd = [
+            FFMPEG_EXE, "-y",
+            "-headers", headers_opt,
+            "-i", media_url,
+            "-vf", "scale=-2:'min(720,ih)'",
+            "-c:v", "libx264", "-crf", "22", "-preset", "fast",
+            "-c:a", "aac", "-b:a", "128k",
+            "-movflags", "+faststart",
+            temp_output
+        ]
+    elif quality == "480p":
+        cmd = [
+            FFMPEG_EXE, "-y",
+            "-headers", headers_opt,
+            "-i", media_url,
+            "-vf", "scale=-2:'min(480,ih)'",
+            "-c:v", "libx264", "-crf", "24", "-preset", "fast",
+            "-c:a", "aac", "-b:a", "128k",
+            "-movflags", "+faststart",
+            temp_output
+        ]
+    elif quality == "360p":
+        cmd = [
+            FFMPEG_EXE, "-y",
+            "-headers", headers_opt,
+            "-i", media_url,
+            "-vf", "scale=-2:'min(360,ih)'",
+            "-c:v", "libx264", "-crf", "26", "-preset", "fast",
+            "-c:a", "aac", "-b:a", "96k",
+            "-movflags", "+faststart",
+            temp_output
+        ]
+    else:
+        cmd = [
+            FFMPEG_EXE, "-y",
+            "-headers", headers_opt,
+            "-i", media_url,
+            "-c:v", "copy",
+            "-c:a", "copy",
+            "-movflags", "+faststart",
+            temp_output
+        ]
+
+    try:
+        proc = subprocess.run(cmd, capture_output=True, timeout=90)
+        if proc.returncode == 0 and os.path.exists(temp_output) and os.path.getsize(temp_output) > 1024:
+            if os.path.exists(target_path):
+                try:
+                    os.remove(target_path)
+                except Exception:
+                    pass
+            os.rename(temp_output, target_path)
+            return target_path
+    except Exception as e:
+        if os.path.exists(temp_output):
+            try:
+                os.remove(temp_output)
+            except Exception:
+                pass
+
+    return None
 
 
 def extract_youtube(url: str) -> Dict[str, Any]:
@@ -186,6 +291,14 @@ def extract_youtube(url: str) -> Dict[str, Any]:
                     "ext": "mp4",
                     "url": f"https://www.youtube.com/watch?v={video_id}&quality=720p",
                 })
+
+            # 480p Medium
+            download_options.append({
+                "id": "480p",
+                "label": "Medium Video (480p)",
+                "ext": "mp4",
+                "url": f"https://www.youtube.com/watch?v={video_id}&quality=480p",
+            })
 
             # 360p Standard
             download_options.append({
@@ -254,15 +367,21 @@ def extract_instagram_user(username: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"Unable to connect to Instagram profile: {str(e)}")
 
     if resp.status_code == 404:
-        raise HTTPException(status_code=404, detail=f"Instagram user @{clean_user} not found.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"User not found! No Instagram account exists with username '@{clean_user}'. Please check the username spelling and try again. (આવો કોઈ યુઝર નથી)"
+        )
 
     if resp.status_code != 200:
         raise HTTPException(status_code=400, detail=f"Instagram profile returned status {resp.status_code}.")
 
     raw_html = resp.text
     is_private = "this account is private" in raw_html.lower() or '"is_private":true' in raw_html.replace(" ", "")
-    if "sorry, this page isn't available" in raw_html.lower():
-        raise HTTPException(status_code=404, detail=f"Instagram profile @{clean_user} is not available.")
+    if ("xig_user_by_igid_v2" not in raw_html and "Followers" not in raw_html) or "sorry, this page isn't available" in raw_html.lower() or "page not found" in raw_html.lower():
+        raise HTTPException(
+            status_code=404,
+            detail=f"No such user found! There is no Instagram account with username '@{clean_user}'. Please check the username spelling and try again. (આવો કોઈ યુઝર નથી)"
+        )
 
     og_title = re.findall(r'<meta property="og:title" content="([^"]+)"', raw_html)
     og_desc = re.findall(r'<meta property="og:description" content="([^"]+)"', raw_html)
@@ -496,12 +615,21 @@ def extract_instagram(url: str) -> Dict[str, Any]:
 
             if not options and video_url:
                 v_ext = "jpg" if video_url.endswith((".jpg", ".png", ".webp")) else "mp4"
-                options.append({
-                    "id": "best_media",
-                    "label": f"Download Media ({v_ext.upper()})",
-                    "ext": v_ext,
-                    "url": video_url
-                })
+                if v_ext == "mp4":
+                    options = [
+                        {"id": "1080p", "label": "Full HD (1080p)", "ext": "mp4", "url": f"/api/download?url={urllib.parse.quote(video_url)}&quality=1080p"},
+                        {"id": "720p", "label": "HD Video (720p)", "ext": "mp4", "url": f"/api/download?url={urllib.parse.quote(video_url)}&quality=720p"},
+                        {"id": "480p", "label": "Medium Video (480p)", "ext": "mp4", "url": f"/api/download?url={urllib.parse.quote(video_url)}&quality=480p"},
+                        {"id": "360p", "label": "Standard Video (360p)", "ext": "mp4", "url": f"/api/download?url={urllib.parse.quote(video_url)}&quality=360p"},
+                        {"id": "audio", "label": "Audio Only (MP3)", "ext": "mp3", "url": f"/api/download?url={urllib.parse.quote(video_url)}&quality=audio"},
+                    ]
+                else:
+                    options.append({
+                        "id": "best_media",
+                        "label": "Download Photo (JPG)",
+                        "ext": "jpg",
+                        "url": video_url
+                    })
 
             if video_url:
                 is_img = video_url.endswith((".jpg", ".png", ".webp"))
@@ -540,6 +668,18 @@ def extract_instagram(url: str) -> Dict[str, Any]:
             is_video = bool(og_video)
             
             if media_url:
+                fb_options = []
+                if is_video:
+                    fb_options = [
+                        {"id": "1080p", "label": "Full HD (1080p)", "ext": "mp4", "url": f"/api/download?url={urllib.parse.quote(media_url)}&quality=1080p"},
+                        {"id": "720p", "label": "HD Video (720p)", "ext": "mp4", "url": f"/api/download?url={urllib.parse.quote(media_url)}&quality=720p"},
+                        {"id": "480p", "label": "Medium Video (480p)", "ext": "mp4", "url": f"/api/download?url={urllib.parse.quote(media_url)}&quality=480p"},
+                        {"id": "360p", "label": "Standard Video (360p)", "ext": "mp4", "url": f"/api/download?url={urllib.parse.quote(media_url)}&quality=360p"},
+                        {"id": "audio", "label": "Audio Only (MP3)", "ext": "mp3", "url": f"/api/download?url={urllib.parse.quote(media_url)}&quality=audio"},
+                    ]
+                else:
+                    fb_options = [{"id": "media", "label": "Direct Photo Download (HD)", "ext": "jpg", "url": media_url}]
+
                 return {
                     "success": True,
                     "platform": "instagram",
@@ -550,14 +690,7 @@ def extract_instagram(url: str) -> Dict[str, Any]:
                     "thumbnail": thumbnail,
                     "duration": None,
                     "download_url": media_url,
-                    "options": [
-                        {
-                            "id": "media",
-                            "label": "Direct Media Download (HD)",
-                            "ext": "mp4" if is_video else "jpg",
-                            "url": media_url,
-                        }
-                    ],
+                    "options": fb_options,
                 }
     except Exception:
         pass
@@ -578,25 +711,32 @@ def extract_instagram(url: str) -> Dict[str, Any]:
 @app.get("/")
 @app.get("/api/health")
 @app.get("/api/py/health")
-@app.get("/health")
-def health_check():
-    return {"status": "ok", "service": "LX-Downloader Python Backend"}
+async def health_check():
+    return {
+        "status": "online",
+        "service": "LX-Downloader API",
+        "version": "1.2.0",
+        "ffmpeg": bool(FFMPEG_EXE)
+    }
 
 
 @app.get("/api/extract")
 @app.get("/api/py/extract")
 @app.get("/extract")
-def extract_media(url: str = Query(..., description="The media URL or Instagram @username to extract")):
-    if not url or not url.strip():
-        raise HTTPException(status_code=400, detail="URL cannot be empty.")
-    
-    trimmed = url.strip().lower()
-    
-    if "youtube.com" in trimmed or "youtu.be" in trimmed:
-        return extract_youtube(url.strip())
-    elif "instagram.com" in trimmed:
-        return extract_instagram(url.strip())
-    
+async def extract_info(url: str = Query(..., description="Media URL or Instagram username")):
+    """Universal metadata extractor for YouTube and Instagram content."""
+    trimmed = url.strip()
+    if not trimmed:
+        raise HTTPException(status_code=400, detail="URL or username parameter is required.")
+
+    # Check for YouTube
+    if any(domain in trimmed.lower() for domain in ["youtube.com", "youtu.be"]):
+        return extract_youtube(trimmed)
+
+    # Check for Instagram URL
+    if "instagram.com" in trimmed.lower():
+        return extract_instagram(trimmed)
+
     # Check if this is an Instagram username (@username or alphanumeric handle)
     clean_handle = trimmed.lstrip("@").strip()
     if re.match(r"^[a-zA-Z0-9._]{1,30}$", clean_handle) and not any(ext in clean_handle for ext in [".com", ".org", ".net", ".io", "http", "/", "watch?"]):
@@ -608,20 +748,64 @@ def extract_media(url: str = Query(..., description="The media URL or Instagram 
     )
 
 
+@app.get("/api/stream")
+@app.get("/api/py/stream")
+@app.get("/stream")
+async def stream_media(url: str = Query(..., description="Direct media stream URL for preview")):
+    """Stream media for in-browser playback and preview with inline disposition and range support."""
+    raw_url = url.strip()
+    if not raw_url:
+        raise HTTPException(status_code=400, detail="Missing stream URL.")
+    
+    ext = "mp4" if (".mp4" in raw_url or "video" in raw_url) else "jpg"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Referer": "https://www.instagram.com/" if ("instagram" in raw_url or "fbcdn" in raw_url) else "https://www.google.com/",
+    }
+
+    client = httpx.AsyncClient(follow_redirects=True, timeout=httpx.Timeout(None, connect=30.0))
+    content_length = None
+    try:
+        head_resp = await client.head(raw_url, headers=headers)
+        content_length = head_resp.headers.get("content-length")
+    except Exception:
+        pass
+
+    async def stream_gen():
+        try:
+            async with client.stream("GET", raw_url, headers=headers) as response:
+                async for chunk in response.aiter_bytes(chunk_size=65536):
+                    yield chunk
+        finally:
+            await client.aclose()
+
+    media_type = "video/mp4" if ext == "mp4" else "image/jpeg"
+    resp_headers = {
+        "Content-Disposition": "inline",
+        "Cache-Control": "public, max-age=3600",
+        "Accept-Ranges": "bytes",
+        "Access-Control-Allow-Origin": "*",
+    }
+    if content_length:
+        resp_headers["Content-Length"] = content_length
+
+    return StreamingResponse(stream_gen(), media_type=media_type, headers=resp_headers)
+
+
 @app.get("/api/download")
 @app.get("/api/py/download")
 @app.get("/download")
 async def download_file(
     url: Optional[str] = Query(None, description="Direct media stream URL or YouTube link"),
     video_id: Optional[str] = Query(None, description="YouTube Video ID"),
-    quality: Optional[str] = Query(None, description="Desired quality: 1080p, 720p, 360p, audio"),
+    quality: Optional[str] = Query(None, description="Desired quality: 1080p, 720p, 480p, 360p, audio"),
     source: Optional[str] = Query(None, description="Platform source: youtube, instagram"),
     filename: Optional[str] = Query("download.mp4", description="Desired filename for saving"),
 ):
     """
-    Download handler with dual mode:
+    Download handler with multi-format and resolution support:
     1. For YouTube: downloads and merges video+audio with faststart MP4 flags, served with exact Content-Length.
-    2. For Instagram / CDN: streams media with full connection reliability and exact headers.
+    2. For Instagram / CDN: scales/transcodes or streams with full connection reliability and exact headers.
     """
     raw_url = (url or "").strip()
     is_yt = (
@@ -675,6 +859,23 @@ async def download_file(
     # Handle Instagram / Direct CDN Streams
     if not raw_url:
         raise HTTPException(status_code=400, detail="Missing download URL.")
+
+    # Quality transcoding for video streams if quality requested
+    if quality and quality in ["1080p", "720p", "480p", "360p", "audio"]:
+        ext = "mp3" if quality == "audio" else "mp4"
+        safe_name = sanitize_filename(filename.rsplit(".", 1)[0], ext=ext)
+        transcoded_path = await asyncio.to_thread(transcode_video, raw_url, quality)
+        if transcoded_path and os.path.exists(transcoded_path):
+            media_type = "audio/mpeg" if ext == "mp3" else "video/mp4"
+            return FileResponse(
+                transcoded_path,
+                media_type=media_type,
+                filename=safe_name,
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Accept-Ranges": "bytes",
+                }
+            )
 
     ext = "mp4" if ".mp4" in raw_url or filename.endswith(".mp4") else "jpg"
     safe_name = sanitize_filename(filename.rsplit(".", 1)[0], ext=ext)
