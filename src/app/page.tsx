@@ -554,10 +554,18 @@ export default function Home() {
 
   const handleSubTabClick = (tabId: string) => {
     setSubTab(tabId);
-    setInputUrl("");
     setErrorMsg("");
-    setResult(null);
     setHasDownloaded(false);
+    if (result && result.type === "profile") {
+      if (tabId === "post" || tabId === "reels" || tabId === "story" || tabId === "highlight") {
+        setProfileFilter(tabId as any);
+      } else {
+        setProfileFilter("all");
+      }
+    } else {
+      setInputUrl("");
+      setResult(null);
+    }
   };
 
   const formatDuration = (seconds?: number) => {
@@ -660,7 +668,13 @@ export default function Home() {
         setShowIframePreview(false);
         setHasDownloaded(false);
         setDownloadCompleted(false);
-        setProfileFilter("all");
+        
+        // Automatically sync profile filter to active subTab (e.g. Post -> only posts, Reels -> only reels)
+        if (subTab === "post" || subTab === "reels" || subTab === "story" || subTab === "highlight") {
+          setProfileFilter(subTab as any);
+        } else {
+          setProfileFilter("all");
+        }
 
         if (data.type === "profile") {
           setResult(data);
@@ -1316,7 +1330,12 @@ export default function Home() {
                               {filterTabs.map((tab) => (
                                 <button
                                   key={tab.id}
-                                  onClick={() => setProfileFilter(tab.id as any)}
+                                  onClick={() => {
+                                    setProfileFilter(tab.id as any);
+                                    if (tab.id === "post" || tab.id === "reels" || tab.id === "story" || tab.id === "highlight") {
+                                      setSubTab(tab.id);
+                                    }
+                                  }}
                                   className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                                     profileFilter === tab.id
                                       ? "bg-white text-blue-600 shadow-sm border border-slate-200/80"
