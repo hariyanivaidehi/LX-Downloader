@@ -31,12 +31,12 @@ export const metadata: Metadata = {
     "free media downloader"
   ],
   alternates: {
-    canonical: "https://lx-downloader.com",
+    canonical: "https://lx-down.vercel.app",
   },
   openGraph: {
     title: "LX-Downloader - Free Instagram & YouTube Media Saver",
     description: "Download Instagram Reels, Stories, Photos, DP, Highlights, and YouTube Videos or Shorts instantly in high quality (HD).",
-    url: "https://lx-downloader.com",
+    url: "https://lx-down.vercel.app",
     siteName: "LX-Downloader",
     locale: "en_IN",
     type: "website",

@@ -110,7 +110,7 @@ export default function Footer() {
   }, []);
 
   const handleShare = (platform: string) => {
-    const url = typeof window !== "undefined" ? window.location.origin : "https://lx-downloader.com";
+    const url = typeof window !== "undefined" ? window.location.origin : "https://lx-down.vercel.app";
     const text = "Check out LX-Downloader - The ultimate Instagram Story, Reels, and Photo Saver!";
     
     let shareUrl = "";
