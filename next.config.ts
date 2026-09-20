@@ -38,7 +38,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/py/:path*",
-        destination: "/api/",
+        destination: "/api/:path*",
       },
     ];
   },
